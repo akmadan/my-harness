@@ -1,0 +1,74 @@
+pipeline:
+  name: Gitops PR Sample-1
+  identifier: Gitops_PR_Sample1
+  projectIdentifier: Krishika_CD_Samples
+  orgIdentifier: default
+  tags: {}
+  stages:
+    - stage:
+        name: Get App Details Sync App
+        identifier: Get_App_Details_Sync_App
+        description: ""
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          gitOpsEnabled: true
+          service:
+            serviceRef: Service_Gitops
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: <+input>
+                      sources: <+input>
+          execution:
+            steps:
+              - step:
+                  type: GitOpsGetAppDetails
+                  name: Gitops Get App Details
+                  identifier: Gitops_Get_App_Details
+                  spec:
+                    hardRefresh: false
+                    applicationsList:
+                      - applicationName: gitops-sample-application
+                        agentId: gitopspragent
+                  timeout: 10m
+              - step:
+                  type: GitOpsSync
+                  name: Gitops Sync App
+                  identifier: Gitops_Sync_App
+                  spec:
+                    prune: false
+                    dryRun: false
+                    applyOnly: false
+                    forceApply: false
+                    applicationsList:
+                      - applicationName: gitops-sample-application
+                        agentId: gitopspragent
+                    retryStrategy: {}
+                    retry: false
+                    syncOptions:
+                      skipSchemaValidation: false
+                      autoCreateNamespace: false
+                      pruneResourcesAtLast: false
+                      applyOutOfSyncOnly: false
+                      replaceResources: false
+                      prunePropagationPolicy: foreground
+                  timeout: 10m
+            rollbackSteps: []
+          environment:
+            environmentRef: Gitops_PR_Env
+            deployToAll: false
+            gitOpsClusters:
+              - identifier: incluster
+                agentIdentifier: gitopspragent
+        tags: {}
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: StageRollback
+        gitOpsEnabled: true
