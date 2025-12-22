@@ -1,0 +1,1 @@
+GitOps Deployment of a Python App (Helm Chart) - Manual Sync & using CD Pipeline

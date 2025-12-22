@@ -1,0 +1,1 @@
+GitOps Deployment using K8s Manifests
