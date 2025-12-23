@@ -1,0 +1,1 @@
+GitOps Deployment of a Python App (Helm Chart) using Harness CD PR Pipeline Trigger
