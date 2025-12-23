@@ -1,5 +1,6 @@
-apiVersion: v2
-name: helm-chart-for-gitops-app
-description: Helm Chart for Gitops App
-version: 1.0.0
-appVersion: 1.0.0
+name: "helm-chart-for-gitops-app"
+description: "Helm Chart for Gitops App"
+appVersion: "1.0.0"
+replicaCount: "3"
+apiVersion: "v2"
+version: "1.0.0"
