@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: default
+  namespace: ns-001
+spec:
+  description: Default Argo CD project
+  sourceRepos:
+    - '*'  # Allow all repositories
+  destinations:
+    - namespace: '*'
+      server: '*'  # Allow all namespaces and clusters
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
