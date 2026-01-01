@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: guestbook-app
+  # Argo CD Applications should be in the argocd namespace for Harness GitOps agent to discover them
+  # Alternatively, ensure the namespace is in Argo CD's application.namespaces config
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    # Optional: Add labels for better organization in Harness
+    app.kubernetes.io/name: guestbook-app
+    app.kubernetes.io/part-of: gitops-project-6
+  annotations:
+    # Optional: Add annotations for Harness GitOps
+    argocd.argoproj.io/description: "Guestbook UI Application managed by Harness GitOps"
+spec:
+  project: default
+  
+  source:
+    # Harness GitOps requires a Git repository source
+    # Replace with your actual Git repository URL
+    repoURL: https://github.com/your-org/your-repo.git
+    path: gitops-project-6/manifest
+    targetRevision: main
+    # If using a private repository, ensure it's configured in Argo CD
+    # directory:
+    #   recurse: true
+    #   include: "*.yaml"
+    #   exclude: "application.yaml"
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ns-001
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+

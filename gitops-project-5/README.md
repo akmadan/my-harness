@@ -1,1 +1,1 @@
-Canary deployments using Argo Rollouts
+Canary deployment using Argo Rollouts
