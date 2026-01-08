@@ -1,9 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: bluegreen-demo
-  labels:
-    app: bluegreen-demo
+  name: canary-demo
 spec:
   ports:
   - port: 80
@@ -11,4 +9,4 @@ spec:
     protocol: TCP
     name: http
   selector:
-    app: bluegreen-demo
+    app: canary-demo
