@@ -20,6 +20,7 @@ spec:
         image: akshitmadanharness/pipeline-project-1-node-server:latest
         ports:
         - containerPort: 3000
+        - containerPort: 9090
         env:
         - name: NODE_ENV
           value: "production"
