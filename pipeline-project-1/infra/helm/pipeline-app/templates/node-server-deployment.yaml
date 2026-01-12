@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-server
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: node-server
+spec:
+  replicas: {{ .Values.nodeServer.replicaCount }}
+  selector:
+    matchLabels:
+      app: node-server
+  template:
+    metadata:
+      labels:
+        app: node-server
+    spec:
+      containers:
+      - name: node-server
+        image: "{{ .Values.nodeServer.image.repository }}:{{ .Values.nodeServer.image.tag }}"
+        imagePullPolicy: {{ .Values.nodeServer.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.nodeServer.service.port }}
+        env:
+        {{- range $key, $value := .Values.nodeServer.env }}
+        - name: {{ $key }}
+          value: "{{ $value }}"
+        {{- end }}
+        resources:
+          {{- toYaml .Values.nodeServer.resources | nindent 12 }}

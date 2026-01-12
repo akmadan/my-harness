@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-server
+  namespace: pipeline-app-1
+  labels:
+    app: node-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: node-server
+  template:
+    metadata:
+      labels:
+        app: node-server
+    spec:
+      containers:
+      - name: node-server
+        image: akshitmadanharness/pipeline-project-1-node-server:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"

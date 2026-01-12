@@ -1,0 +1,6 @@
+apiVersion: v2
+name: pipeline-app
+description: A Helm chart for pipeline-app with React frontend and Node.js backend
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

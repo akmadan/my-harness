@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: react-frontend-service
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    app: react-frontend
+  ports:
+    - protocol: TCP
+      port: {{ .Values.reactFrontend.service.port }}
+      targetPort: {{ .Values.reactFrontend.service.port }}
+  type: {{ .Values.reactFrontend.service.type }}
