@@ -1,5 +1,5 @@
-# Build stage
-FROM node:18-alpine as build
+# Build stage - Use AMD64 platform
+FROM --platform=linux/amd64 node:18-alpine as build
 
 # Set working directory
 WORKDIR /app
@@ -16,8 +16,8 @@ COPY . .
 # Build the React app
 RUN npm run build
 
-# Production stage
-FROM nginx:alpine
+# Production stage - Use AMD64 platform
+FROM --platform=linux/amd64 nginx:alpine
 
 # Copy built app to nginx
 COPY --from=build /app/build /usr/share/nginx/html

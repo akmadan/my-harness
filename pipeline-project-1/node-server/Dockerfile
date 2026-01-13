@@ -1,5 +1,5 @@
-# Use Node.js LTS version
-FROM node:18-alpine
+# Use Node.js LTS version for AMD64
+FROM --platform=linux/amd64 node:18-alpine
 
 # Set working directory
 WORKDIR /app

@@ -7,7 +7,7 @@ nodeServer:
   replicaCount: 2
   image:
     repository: akshitmadanharness/pipeline-project-1-node-server
-    tag: latest
+    tag: v2
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -27,7 +27,7 @@ reactFrontend:
   replicaCount: 2
   image:
     repository: akshitmadanharness/pipeline-project-1-react-frontend
-    tag: latest
+    tag: v2
     pullPolicy: IfNotPresent
   service:
     type: LoadBalancer

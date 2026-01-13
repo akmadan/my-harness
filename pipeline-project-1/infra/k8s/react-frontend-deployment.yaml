@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: react-frontend
-        image: akshitmadanharness/pipeline-project-1-react-frontend:latest
+        image: akshitmadanharness/pipeline-project-1-react-frontend:v2
         ports:
         - containerPort: 80
         resources:

@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: node-server
-        image: akshitmadanharness/pipeline-project-1-node-server:latest
+        image: akshitmadanharness/pipeline-project-1-node-server:v2
         ports:
         - containerPort: 3000
         - containerPort: 9090
