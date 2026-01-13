@@ -1,4 +1,4 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: pipeline-app-1
+  name: akshit-pipeline-app-1

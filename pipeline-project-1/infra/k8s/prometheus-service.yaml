@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: prometheus-service
-  namespace: pipeline-app-1
+  namespace: akshit-pipeline-app-1
 spec:
   selector:
     app: prometheus
@@ -10,4 +10,5 @@ spec:
     - protocol: TCP
       port: 9090
       targetPort: 9090
+      name: http
   type: LoadBalancer

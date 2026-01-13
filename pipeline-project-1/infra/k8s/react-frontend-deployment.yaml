@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: react-frontend
-  namespace: pipeline-app-1
+  namespace: akshit-pipeline-app-1
   labels:
     app: react-frontend
 spec:

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: prometheus
-  namespace: pipeline-app-1
+  namespace: akshit-pipeline-app-1
   labels:
     app: prometheus
 spec:
