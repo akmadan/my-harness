@@ -11,8 +11,4 @@ spec:
       port: 3000
       targetPort: 3000
       name: http
-    - protocol: TCP
-      port: 9090
-      targetPort: 9090
-      name: metrics
   type: ClusterIP
