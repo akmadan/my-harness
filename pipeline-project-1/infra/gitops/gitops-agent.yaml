@@ -12,7 +12,7 @@ metadata:
     app.kubernetes.io/part-of: harness-gitops
     app.kubernetes.io/version: "v0.107.0"
   name: argocd-application-controller
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
 spec:
   ingress:
   - from:
@@ -31,7 +31,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: argocd-applicationset-controller
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: argocd-applicationset-controller
@@ -68,7 +68,7 @@ metadata:
     app.kubernetes.io/part-of: harness-gitops
     app.kubernetes.io/version: "v0.107.0"
   name: argocd-repo-server
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
 spec:
   ingress:
   - from:
@@ -111,7 +111,7 @@ metadata:
     app.kubernetes.io/part-of: harness-gitops
     app.kubernetes.io/version: "v0.107.0"
   name: argocd-redis
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
 spec:
   ingress:
   - from:
@@ -150,7 +150,7 @@ kind: ServiceAccount
 automountServiceAccountToken: true
 metadata:
   name: argocd-application-controller
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-application-controller
@@ -166,7 +166,7 @@ kind: ServiceAccount
 automountServiceAccountToken: true
 metadata:
   name: argocd-applicationset-controller
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-applicationset-controller
@@ -182,7 +182,7 @@ kind: ServiceAccount
 automountServiceAccountToken: true
 metadata:
   name: argocd-repo-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-repo-server
@@ -198,7 +198,7 @@ kind: ServiceAccount
 automountServiceAccountToken: false
 metadata:
   name: argocd-redis
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-redis
@@ -214,7 +214,7 @@ kind: ServiceAccount
 automountServiceAccountToken: true
 metadata:
   name: gitops-agent
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: harness-gitops-agent
@@ -229,7 +229,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: gitops-agent-upgrader
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: harness-gitops-agent-upgrader
@@ -244,7 +244,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: argocd-secret
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-secret
@@ -268,11 +268,11 @@ metadata:
     app.kubernetes.io/part-of: harness-gitops
     app.kubernetes.io/version: "v0.107.0"
   name: gitops-agent
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 type: Opaque
 stringData:
   GITOPS_AGENT_TOKEN: |
-    LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFdlFJQkFEQU5CZ2txaGtpRzl3MEJBUUVGQUFTQ0JLY3dnZ1NqQWdFQUFvSUJBUUN5c2VkbGJKSmg0SnRQCm16Z29nTlR2R0pzdFIraXd2Slc0T0tlNTc1VElxMkR0VXNVZGV5UjRpRzRWb0gzTWgwTEZyOWNYNVhQZ3pRZmQKd0FJSlpwWXdnSFU5QkJxQlpFeDFkbldlRE1pRGdEV3dUZ1NzbU9xTjQ5bFpVV0tUaTcyeldGMVkrQmg0ZGtlawo2dVA4UTYvaGRGZE14blA4TDh5alowT2hNaU15NW5qZ0UrNE9Na2RIVlpjMTNTbnd0SDMxeHRzL1ovNHNldHJaCkEwUDY5bHQ0TXZNRE1lYUMrdHBiL3g0Uk80NEwyZlJvK3paMm55Z1UyVGRjOGdQMmp4WmYrMnZtdTFSNFBid00KL3pFV0VnTUlZSXQzSVZBS091dUF3RzNDSzE0U1NxRHZSaW1NSnFMblc4eFI1M3FXN1V2WVFocWI2SHZNbE55eQppL1FVejhtTEFnTUJBQUVDZ2dFQUo1MTdJQ2dXdDY0MG9FeFlBZHExMmgvSlh4dC9BWmQ5VmE3eHVDM2QvVExKCk5UUFJVVHpZbEFRaTY1Wjk3UmJiZmJvQzVHQlE5VGhmRXhFYklueGt0WEgxQzhiYUhXOWY1L2FRRXE3ZzBRNWUKV0t5aktxUm44M2JjMjRsSVlrOXJpZFFBTmRZaWpxb2lMZlNKQUliOCtlMXg0U3BwMGpIQ20wTXNZaE1jYkk3Kwp1dXpBdjFOc2R4c3MyaHJCekN4SDVBaUJCNDdNdEJudkJ2Rk9EUGl2SWVPcFZyRDMrMlF2cHN6WmRpeEpoeDYvCk54OCtGRG81UERNWktOUEk0WkVWSjNYdWtDQnBjeE9KNDB2VjJIMlJROW1oRUhBVGxpSGdVRzBPbXBsNFNLdFQKWkJZU1ZjMXV2cDVzL2N4UDVLNENlejVjdUF2UFJ6a0lkZmtqK2t6b09RS0JnUURObnREQlFJcUl4TmtGZlFXWApoVEZSeDlUUkZiak5CMnhsZnI2cjlmTW56VTFKc2pXZ1F5UCtYaldvOGZha1FoQXdXcDJtMEVBNGE5aTFibHZECkxGSjN6ZUx0WFk0dU5aNDVoZ0FuMExpTVVhUEkxS3Q0cEdweG1GcU5BN1VTYi9TcldCeEVGbmN0QzI5c2ZXUEcKbGY5NHY2UnMrSkdMVkZoTTB0ck1QRTFNendLQmdRRGVlanlieWpkaXMxWGI1YU9Ld2F3bnlWMHE4OUsra0dkTAp2SXZMekxpejhyeTU3UHltY3FiM3RTOGFMMjVjVDRUQ29aYnRsMUZ1WUJFMGRWemV2eG9FejBEQllvVEg1WnVRClNwbVlnK1NZVTBaU0U4b0w3OG16eUxGekExclBkc2xEVzR3YU4wd2NES095OEgxVWhYZkVxVFUxMmIyYTN4aWoKK21Bb1hkZCtoUUtCZ1FDQzZUTWxacThNeHE4WlJIRFQrRFBmU21mZk9vSXUzeVFQTm5PMHplRWluUjR3NW1vbgovN2NoMHQ4OUVkZ2kyZ0N1bUhLNDZ1dUlRSGwzZ2F5Z2hVNTRBamdSUWJndENXd1VXWkV0eUVCRzdnOWw1S2pMCkpYcXptZmxFd0hCL0xaSkxxTXhPT1RObEZWdTZhZGFsYjRoNFd5TVhVZVp3RzZJZ1B6cVlQMmhEbHdLQmdFcTgKeForUVR3clpNLzZySmtWMnlsNlRScmtuTDZUVTNkNlRlR0wrWXc0UWZWWDRSdWVqbkhPYWFqaGh0ckZNQlUxYworMWJWZm9XVndESGZPMU9ZM3lTK2V3SjhGaDhSQXpGMTNpTmVLMjBBako4R0J0bjdzOGF4cE9yK05ZTjhaQ0E4Cm9OUXR2Mk9zMjFGQmVOanIvVkFUaDh5UFdTS3R6NWxHZ3djTWYxZ0JBb0dBTDAxdjQrcnRHblJQSlhZME9SQ3AKT3NhSDRXUXc3U1Jqc0loeS9EaVhuaU4yNXJIOE82aHNZcTRJd1hlMjNmUjdmY3VuejI0Y0NxdVZxMkx1R04xYQpyc1A5N2s0ZUg2TjlQMjU4c1BCOS9BNFd3ckwvYUtNR2kyVzNUYmlobFZOWnFRR3NQcFh1L3liWXlBUEV5QmNxCkQzdDFoUDhsbFZ5bThNMElid2R4ZGdjPQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
+    LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFdmdJQkFEQU5CZ2txaGtpRzl3MEJBUUVGQUFTQ0JLZ3dnZ1NrQWdFQUFvSUJBUUNqdjNWMXMyN3Y4VFpvCm9MR0hoR3dZeWtEcmpwWUFKaUhNc2ZBZFNXQ2Y1dXYzQ2ZnWStBZlp3Tnk1cHpqVDZvU0xwS2dYSCtGUnplOUwKNG1aTVdESUlyT0Fmb1lGU0pVRThTcXZXVVBnWG9DU3ovS2hhNGJja2JqQTZIeWk1SXRYRmxYdFFUR2dXblZMYwpkeENrQ3QzdlB5R1RiVTRwdVUyTUFKVHJvR0RhWmNZY1p3Um9NMisvVVZvOURNb0xGRVBUUEY4YkhkeXRBbkkvCmwvUlBtTS96aWFFRXRlbG1ya0lqV01lS2N4aS8zVmZKTU1kUy9nbWw1Mnllc3U5UzZkdTV1cFJvYWR6Um1ubFYKV3NCcXhUVlhBeHp5eGtma0kxT3R3OVk4SittQyszd0lnemRkT2ZETTNVcTJWZ0l4Vk5nK1BYb0V0WjJxeUpqVgp5SGFzTS9iTEFnTUJBQUVDZ2dFQUF6ejJCYTNXczhnQlczQlNFbXY3OTBHSXB4L2F0NFlKaFJLL3ZOU0dwS0xjClo3WTZ3Y09sNUJoOFJPK1pvQmN6SjgvSnd5dE9PVi9wSzRiK251UGZtV3hSd2s1ZlVGQ01TYlR3VVB5bzYwNnYKYXgvRDlJZ2lKd1pHemQ5djNybGhvTmFqNmFLWkxGbFFHaXdBbUQzZXhheHA3WkJyeTBkdTBTWHh5L2NQODBHbgozREQycG8zdCsraXFLYXJFeTVZVkNDNkJwYWY1Rm9aZHg4UG5mSzN3cWprZ2hEODNyYTJKN0JLeHN0MFhhQWEvCjFXNDVnOW9hKytBVlk1dTJ3VE8rWnNnM09sdGZkUG9vdkI3cjFRV0ZsS25ybktUS29QTmI5VmxKdzRFSjFMblUKZDQwQ0pWbmI0LzhCaFM2Sm9CSXRnTTAvbmlTeVhSQmtXWFJzTFZzY2dRS0JnUURaL0Nia1RLaDdMTHVCVHlBMwpQODcwREJlcFUzWDZ2Q1JEcVc5NjR5MnpjdjlRZldkcTBVTlQ2YXFKRkpsZFVub1RjUUVzQVY1UlRjMVVWQkw0CnFmb3ZZcTF4dEIxdTBHQVVKRVJ6VW1oSFVHN0xhK00zeFlnalpRVVMwdTVOSm5OcDR4NTQ0YkZYYmNEampUNk0KTnduMiszT05QcUtxODNsM0hDQURxMGl3RndLQmdRREFUZW83RVNnVlpRWnRBeExObG8zaGdPbmhORjl3ZGJkbgoyRElhZms4eEExakpKV0pESmNVVmFjR2xxS2hMekpFZkxGS1VsbkNLNm5WLzI4b3Axa1VWdDdneC82TDhLR3BCCkw1TW1ZL0tLQ2RhaVp6UE1uV3hrU3Q2TEorR2t0RTFkdWFVeTlHdm96cngvbmdTN3lJMjZ2eFd4b25UU3cyZ2kKOE5Cc1ZOQUxiUUtCZ0RsWHM0TnJCd2NnQlZORzFWcXpWbVdzcUt6S1g4Yk5wMXlGUGVZOXpNL2YrSG5jQTFCKwpMQS91OEFXUGZhaW5BYVlMbkJ0UFlOaFNkeWt2MUszRlNTTWQrakpuQnpjWGFhN2l1Mzc2dHFQTDdObG1VQ2RqCnR5UllkclUwOTZzajZraDRqcE9PQzNETVZtbUZ4bVpzTkJyY210RVZJUVdIZHZSMldaV2RnVW1SQW9HQkFKZFkKT3JIRjdOLzVwRGNESmpjNjkrcXp4RjJERkdHem8yWk0xaEhYdW9kK2RNL0paaTRtZVpkQ3BpNjBMOCtIN2VhMAp3VUZEck1zSGZ2WGppcFdtbHJSaTVNb2t3S2JuUDhpUm9xT2lJVzNXRkYrNERTSkordFpydmYyU281azJkWFQvCitDM0VBM0V6MDFJMGtORWhJN29IVFJHQ0k2TUVPdDdVMjVPR3BEMTVBb0dCQUtVeSt6M2dKSGtGMUFocTEwVnUKWEk0cElnT0dtRDhtTnRQaU9UVnJFRTZMTTYxaGJpWXgzQ1ViVjloZVIxQ2IwTGY0ZWdvNUlybG5oSlBQQXY3NQp0OEx6QUpHUHNOMmJ3RG40YmdjTW0wUTN1UTJCc051QVpxS2RVV1lCSEpzVzV6UVpTa0tTQ2o3RWZLOFZCOHpKCitvZ2c0MWJnbEtuQTc4TStnMWpyWmZ0YgotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
 ---
 # Source: gitops-helm/templates/gitops-agent/secret.yaml
 apiVersion: v1
@@ -287,7 +287,7 @@ metadata:
     app.kubernetes.io/part-of: harness-gitops
     app.kubernetes.io/version: "v0.107.0"
   name: gitops-agent-mtls
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 type: Opaque
 data:
   client.crt: |
@@ -299,7 +299,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: argocd-cm
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-cm
@@ -423,7 +423,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: argocd-cmd-params-cm
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-cmd-params-cm
@@ -457,7 +457,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: argocd-gpg-keys-cm
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-gpg-keys-cm
@@ -471,7 +471,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: argocd-rbac-cm
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-rbac-cm
@@ -491,7 +491,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: argocd-ssh-known-hosts-cm
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-ssh-known-hosts-cm
@@ -521,7 +521,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: argocd-tls-certs-cm
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-tls-certs-cm
@@ -535,7 +535,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: argocd-redis-health-configmap
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-redis
@@ -576,7 +576,7 @@ data:
 apiVersion: v1
 data:
   GITOPS_ACCOUNT_IDENTIFIER: 1bvyLackQK-Hapk25-Ry4w
-  GITOPS_AGENT_IDENTIFIER: agentakshitpipelineproject1
+  GITOPS_AGENT_IDENTIFIER: agentgitopsakshitpipelineproject1
   GITOPS_ORG_IDENTIFIER: default
   GITOPS_PROJECT_IDENTIFIER: akshitprojectqa
   GITOPS_SERVICE_HTTP_TLS_ENABLED: "false"
@@ -621,7 +621,7 @@ metadata:
     app.kubernetes.io/part-of: harness-gitops
     app.kubernetes.io/version: "v0.107.0"
   name: gitops-agent
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 ---
 # Source: gitops-helm/templates/gitops-agent/pluginconfigmap.yaml
 apiVersion: v1
@@ -636,7 +636,7 @@ metadata:
     app.kubernetes.io/part-of: harness-gitops
     app.kubernetes.io/version: "v0.107.0"
   name: argocd-harness-plugin
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 data:
   harness.yaml: |
     ---
@@ -663,11 +663,11 @@ data:
 apiVersion: v1
 data:
   UPGRADER_GITOPS_ACCOUNT_IDENTIFIER: 1bvyLackQK-Hapk25-Ry4w
-  UPGRADER_GITOPS_AGENT_IDENTIFIER: agentakshitpipelineproject1
+  UPGRADER_GITOPS_AGENT_IDENTIFIER: agentgitopsakshitpipelineproject1
   UPGRADER_GITOPS_ORG_IDENTIFIER: default
   UPGRADER_GITOPS_PROJECT_IDENTIFIER: akshitprojectqa
   UPGRADER_MODE: GitopsAgent
-  UPGRADER_NAMESPACE: akshit-pipeline-app-1
+  UPGRADER_NAMESPACE: ns-akshit-pipeline-app-1
   UPGRADER_WORKLOAD_NAME: gitops-agent
   UPGRADER_CONTAINER_NAME: gitops-agent
   UPGRADER_GITOPS_AGENT_HTTP_TARGET: https://qa.harness.io/prod1/gitops
@@ -676,7 +676,7 @@ data:
 kind: ConfigMap
 metadata:
   name: gitops-agent-upgrader
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
 ---
 # Source: gitops-helm/charts/argo-cd/templates/crds/crd-application.yaml
 apiVersion: apiextensions.k8s.io/v1
@@ -24674,7 +24674,7 @@ spec:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: argocd-application-controller-akshit-pipeline-app-1
+  name: argocd-application-controller-ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: argocd-application-controller
@@ -24699,7 +24699,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: argocd-repo-server-akshit-pipeline-app-1
+  name: argocd-repo-server-ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: argocd-repo-server
@@ -24724,7 +24724,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: agent-akshit-pipeline-project-1-agent
+  name: agent-gitops-akshit-pipeline-project-1-agent
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: harness-gitops-agent
@@ -24790,7 +24790,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: argocd-application-controller-akshit-pipeline-app-1
+  name: argocd-application-controller-ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: argocd-application-controller
@@ -24802,17 +24802,17 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: argocd-application-controller-akshit-pipeline-app-1
+  name: argocd-application-controller-ns-akshit-pipeline-app-1
 subjects:
 - kind: ServiceAccount
   name: argocd-application-controller
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 ---
 # Source: gitops-helm/templates/argocd-repo-server/clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: argocd-repo-server-akshit-pipeline-app-1
+  name: argocd-repo-server-ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: argocd-repo-server
@@ -24824,17 +24824,17 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: argocd-repo-server-akshit-pipeline-app-1
+  name: argocd-repo-server-ns-akshit-pipeline-app-1
 subjects:
 - kind: ServiceAccount
   name: argocd-repo-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 ---
 # Source: gitops-helm/templates/gitops-agent/clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: agent-akshit-pipeline-project-1-agent
+  name: agent-gitops-akshit-pipeline-project-1-agent
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: harness-gitops-agent
@@ -24846,18 +24846,18 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: agent-akshit-pipeline-project-1-agent
+  name: agent-gitops-akshit-pipeline-project-1-agent
 subjects:
 - kind: ServiceAccount
   name: gitops-agent
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 ---
 # Source: gitops-helm/charts/argo-cd/templates/argocd-application-controller/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: argocd-application-controller
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-application-controller
@@ -24911,7 +24911,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: argocd-applicationset-controller
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-applicationset-controller
@@ -25008,7 +25008,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: argocd-repo-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-repo-server
@@ -25024,7 +25024,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: argocd-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-server
@@ -25074,7 +25074,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: gitops-agent
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: harness-gitops-agent
@@ -25168,7 +25168,7 @@ kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: gitops-agent-upgrader
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: harness-gitops-agent-upgrader
@@ -25209,7 +25209,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: argocd-application-controller
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-application-controller
@@ -25225,14 +25225,14 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: argocd-application-controller
-    namespace: akshit-pipeline-app-1
+    namespace: ns-akshit-pipeline-app-1
 ---
 # Source: gitops-helm/charts/argo-cd/templates/argocd-applicationset/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: argocd-applicationset-controller
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-applicationset-controller
@@ -25248,14 +25248,14 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: argocd-applicationset-controller
-    namespace: akshit-pipeline-app-1
+    namespace: ns-akshit-pipeline-app-1
 ---
 # Source: gitops-helm/charts/argo-cd/templates/argocd-repo-server/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: argocd-repo-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-repo-server
@@ -25271,14 +25271,14 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: argocd-repo-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 ---
 # Source: gitops-helm/charts/argo-cd/templates/argocd-server/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: argocd-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-server
@@ -25294,14 +25294,14 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: argocd-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 ---
 # Source: gitops-helm/templates/gitops-agent/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: gitops-agent
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: harness-gitops-agent
@@ -25317,14 +25317,14 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: gitops-agent
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 ---
 # Source: gitops-helm/templates/upgrader/rolebinding.yaml
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: gitops-agent-upgrader
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: harness-gitops-agent-upgrader
@@ -25340,14 +25340,14 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: gitops-agent-upgrader
-    namespace: "akshit-pipeline-app-1"
+    namespace: "ns-akshit-pipeline-app-1"
 ---
 # Source: gitops-helm/charts/argo-cd/templates/argocd-applicationset/metrics.yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: argocd-applicationset-controller-metrics
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-metrics
@@ -25372,7 +25372,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: argocd-applicationset-controller
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-applicationset-controller
@@ -25396,7 +25396,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: argocd-repo-server-metrics
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-repo-server-metrics
@@ -25429,7 +25429,7 @@ metadata:
     app.kubernetes.io/part-of: argocd
     app.kubernetes.io/version: "v3.1.8"
   name: argocd-repo-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 spec:  
   ports:
   - name: tcp-repo-server
@@ -25445,7 +25445,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: argocd-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-server
@@ -25475,7 +25475,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: argocd-redis
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-redis
@@ -25498,7 +25498,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: gitops-agent-metrics
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: harness-gitops-agent-metrics
@@ -25523,7 +25523,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: gitops-agent
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: harness-gitops-agent
@@ -25548,7 +25548,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: argocd-applicationset-controller
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-applicationset-controller
@@ -25567,7 +25567,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/cmd-params: 4720f4b441f7959546fe6a59ab9154807bb202ab91591fc172774494bef648b2
+        checksum/cmd-params: c658abbaa4e8e3d25d02bbd08ce8ae240ae3a88515d93b656b7647c5c6a3b931
       labels:
         helm.sh/chart: argo-cd-9.0.0
         app.kubernetes.io/name: argocd-applicationset-controller
@@ -25838,7 +25838,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: argocd-repo-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-repo-server
@@ -25857,8 +25857,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/cmd-params: 4720f4b441f7959546fe6a59ab9154807bb202ab91591fc172774494bef648b2
-        checksum/cm: e1ed20250dd9a029a63ac182251b57b46e905227763b0f4b26d5cc35d57ab856
+        checksum/cmd-params: c658abbaa4e8e3d25d02bbd08ce8ae240ae3a88515d93b656b7647c5c6a3b931
+        checksum/cm: 940ed7913aec155a13d13204226a94803cf48df4a4ea8cbb6de23dc1d6d98a5a
       labels:
         helm.sh/chart: argo-cd-9.0.0
         app.kubernetes.io/name: argocd-repo-server
@@ -26330,7 +26330,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: argocd-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-server
@@ -26349,8 +26349,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/cmd-params: 4720f4b441f7959546fe6a59ab9154807bb202ab91591fc172774494bef648b2
-        checksum/cm: e1ed20250dd9a029a63ac182251b57b46e905227763b0f4b26d5cc35d57ab856
+        checksum/cmd-params: c658abbaa4e8e3d25d02bbd08ce8ae240ae3a88515d93b656b7647c5c6a3b931
+        checksum/cm: 940ed7913aec155a13d13204226a94803cf48df4a4ea8cbb6de23dc1d6d98a5a
       labels:
         helm.sh/chart: argo-cd-9.0.0
         app.kubernetes.io/name: argocd-server
@@ -26793,7 +26793,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: argocd-redis
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-redis
@@ -26886,7 +26886,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gitops-agent
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: harness-gitops-agent
@@ -26905,7 +26905,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secrets: 92854b142c4b5796adedb0a9b26ea61982ce9038ff3aa66ad03262d79313f20b
+        checksum/secrets: 022bc8f9a6b46bb176cd4df3245b19b4e1761a20c4c780e2203e84d21730a1af
       labels:
         helm.sh/chart: gitops-helm-1.2.0
         app.kubernetes.io/name: harness-gitops-agent
@@ -27054,7 +27054,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: argocd-application-controller
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     helm.sh/chart: argo-cd-9.0.0
     app.kubernetes.io/name: argocd-application-controller
@@ -27074,8 +27074,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/cmd-params: 4720f4b441f7959546fe6a59ab9154807bb202ab91591fc172774494bef648b2
-        checksum/cm: e1ed20250dd9a029a63ac182251b57b46e905227763b0f4b26d5cc35d57ab856
+        checksum/cmd-params: c658abbaa4e8e3d25d02bbd08ce8ae240ae3a88515d93b656b7647c5c6a3b931
+        checksum/cm: 940ed7913aec155a13d13204226a94803cf48df4a4ea8cbb6de23dc1d6d98a5a
       labels:
         helm.sh/chart: argo-cd-9.0.0
         app.kubernetes.io/name: argocd-application-controller
@@ -27452,7 +27452,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: gitops-agent-upgrader
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
   labels:
     helm.sh/chart: gitops-helm-1.2.0
     app.kubernetes.io/name: harness-gitops-agent-upgrader
@@ -27513,7 +27513,7 @@ kind: ServiceAccount
 automountServiceAccountToken: true
 metadata:
   name: argocd-redis-secret-init
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation
@@ -27542,7 +27542,7 @@ metadata:
     app.kubernetes.io/part-of: argocd
     app.kubernetes.io/version: "v3.1.8"
   name: argocd-redis-secret-init
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
 rules:
   - apiGroups:
       - ""
@@ -27575,7 +27575,7 @@ metadata:
     app.kubernetes.io/part-of: argocd
     app.kubernetes.io/version: "v3.1.8"
   name: argocd-redis-secret-init
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -27589,7 +27589,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: argocd-redis-secret-init
-  namespace: "akshit-pipeline-app-1"
+  namespace: "ns-akshit-pipeline-app-1"
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation

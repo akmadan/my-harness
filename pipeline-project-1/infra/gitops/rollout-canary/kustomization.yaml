@@ -6,4 +6,5 @@ resources:
 - react-frontend-service.yaml
 - react-frontend-preview-service.yaml
 - node-server-rollout.yaml
+- node-server-service.yaml
 - node-server-preview-service.yaml
