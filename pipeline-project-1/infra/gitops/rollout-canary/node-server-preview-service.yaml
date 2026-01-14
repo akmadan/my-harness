@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: node-server-preview
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 spec:
   type: ClusterIP
   ports:

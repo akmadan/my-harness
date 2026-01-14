@@ -1,6 +1,6 @@
 # Global values
 global:
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 
 # Node.js Server Configuration
 nodeServer:

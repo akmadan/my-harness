@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
   name: node-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 spec:
   replicas: 2
   revisionHistoryLimit: 2

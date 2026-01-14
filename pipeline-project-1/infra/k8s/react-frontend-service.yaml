@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: react-frontend-service
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 spec:
   selector:
     app: react-frontend

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: prometheus-config
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
 data:
   prometheus.yml: |
     global:

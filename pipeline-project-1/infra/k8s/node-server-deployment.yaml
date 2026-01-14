@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: node-server
-  namespace: akshit-pipeline-app-1
+  namespace: ns-akshit-pipeline-app-1
   labels:
     app: node-server
 spec:
