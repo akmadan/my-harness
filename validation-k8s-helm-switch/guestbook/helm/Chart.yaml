@@ -1,0 +1,6 @@
+apiVersion: v2
+name: guestbook
+description: Guestbook app - same as k8s manifest for K8s/Helm switch validation
+type: application
+version: 0.1.0
+appVersion: "v5"
