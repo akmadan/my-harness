@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: guestbook-ui
-          image: akshitmadanharness/loans-api:v2
+          image: docker.io/akshitmadanharness/loans-api:v2
           ports:
             - containerPort: 80
               name: http

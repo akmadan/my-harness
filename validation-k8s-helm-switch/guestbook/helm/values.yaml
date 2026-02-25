@@ -1,6 +1,6 @@
 replicaCount: 2
 image:
-  repository: akshitmadanharness/loans-api
+  repository: docker.io/akshitmadanharness/loans-api:v2
   tag: v2
   pullPolicy: IfNotPresent
 service:
