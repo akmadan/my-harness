@@ -1,7 +1,7 @@
 replicaCount: 2
 image:
-  repository: docker.io/ibmcom/guestbook
-  tag: v5
+  repository: akshitmadanharness/loans-api
+  tag: v2
   pullPolicy: IfNotPresent
 service:
   type: ClusterIP
