@@ -1,6 +1,6 @@
 replicaCount: 2
 image:
-  repository: gcr.io/google-samples/gb-frontend
+  repository: docker.io/ibmcom/guestbook
   tag: v5
   pullPolicy: IfNotPresent
 service:
