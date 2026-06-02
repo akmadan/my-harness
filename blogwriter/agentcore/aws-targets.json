@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "name": "default",
+    "description": "Primary deployment target for BlogWriter agent",
+    "account": "806630305776",
+    "region": "us-east-1"
+  }
+]
