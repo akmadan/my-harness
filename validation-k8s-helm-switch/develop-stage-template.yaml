@@ -1,0 +1,2531 @@
+template:
+  name: Multi-Phase Deploy
+  description: Created from v32. Added EG canary configs
+  type: Stage
+  spec:
+    type: Deployment
+    spec:
+      deploymentType: Kubernetes
+      gitOpsEnabled: false
+      environment:
+        environmentRef: <+input>
+        deployToAll: false
+        environmentInputs: <+input>
+        serviceOverrideInputs: <+input>
+        infrastructureDefinitions: <+input>
+      execution:
+        steps:
+          - step:
+              name: LogModuleInfoToCad
+              identifier: log_module_info_to_cad
+              template:
+                templateRef: account.log_module_info_to_cad
+                versionLabel: Version1
+          - step:
+              type: ShellScript
+              name: Check LiVE Sev-1  for Prod Release
+              identifier: check_live_sev1_for_prod_release
+              spec:
+                shell: Bash
+                executionTarget: {}
+                source:
+                  type: Inline
+                  spec:
+                    script: |
+
+                      . fetch_config secret/non-prod/qe/hs-productivity-metrics
+
+                      jql='project = LIVE AND issuetype = Incident AND status IN ("In Progress", Open, Reopened) AND priority = "Sev. 1"'
+                      url_encoded_jql=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$jql'''))")
+
+                      # echo $url_encoded_jql
+
+                      #  intentionally fetching 0 jira ticket details to save time. Because the repose would have "totals" indicating total number of tickets matching the JQL
+                      response=$(curl -s "https://hotstar.atlassian.net/rest/api/3/search?jql=$url_encoded_jql&maxResults=0" \
+                      --header 'Accept: application/json' \
+                      --user "$JIRA_PE_TOOLS_ENG_USERNAME:$JIRA_PE_TOOLS_ENG_PASSWORD")
+
+                      total_in_progress_live_sev_ones=$(echo $response | jq -r '.total')
+
+                      if [ "$total_in_progress_live_sev_ones" -gt 0 ]; then
+                        echo "There are IN_PROGRESS, Open or Reopened Sev. 1 ticket in LIVE board. Pipeline need manual approval prod deployment. Please Be careful while approving"
+                        echo "Check: https://hotstar.atlassian.net/jira/software/c/projects/LIVE/issues/?jql=$url_encoded_jql"
+                        export ongoingLiveSev1='True'
+                      else
+                        echo "NO LIVE Sev. 1 tickets found in IN_PROGRESS, Open or Reopened state. Allowing Prod deployment"
+                        export ongoingLiveSev1='False'
+                      fi
+                environmentVariables: []
+                outputVariables:
+                  - name: ongoingLiveSev1
+                    type: String
+                    value: ongoingLiveSev1
+              timeout: 10m
+              failureStrategies:
+                - onFailure:
+                    errors:
+                      - DelegateProvisioning
+                      - DelegateRestart
+                    action:
+                      type: MarkAsSuccess
+              when:
+                stageStatus: Success
+                condition: (<+variable.account.enable_live_sev_1_check_for_prod> == 'True') && (<+env.type> == "Production")
+          - step:
+              name: Notify Manual Approval for Pipeline Start
+              identifier: manual_approval_for_pipeline_start
+              template:
+                templateRef: account.notification_template
+                versionLabel: "2"
+                templateInputs:
+                  type: ShellScript
+                  spec:
+                    environmentVariables:
+                      - name: notification_context
+                        type: String
+                        value: Manual UI Approval For Deployment Start
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - DelegateRestart
+                          - DelegateProvisioning
+                        action:
+                          type: Retry
+                          spec:
+                            retryCount: 3
+                            retryIntervals:
+                              - 1m
+                            onRetryFailure:
+                              action:
+                                type: MarkAsSuccess
+                  when:
+                    stageStatus: Success
+                    condition: ( <+serviceVariableOverrides.EnableTrueCD>!='True' && ( ( <+serviceVariableOverrides.EnableManualApprovalPostReleaseTicketApproval>=='True' && <+env.type> == "Production" ) || ( <+serviceVariableOverrides.TestConfigFilePath>==null && ( ( <+env.name> == "develop" && <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> == "hs_eks_spike_api_aps1" ) || ( <+env.name> == "qa" && ( <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.develop_infradef> != "null" || ( <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> != "null" && <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> != "" ) ) ) || ( <+env.name> == "preprod" && ( <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.develop_infradef> != "null" || <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.qa_infradef> != "null" || ( <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> != "null" && <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> != "" ) ) ) || ( <+env.name> == "staging" && <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.preprod_infradef> != "null" ) ) ) ) ) || ( <+env.type> == "Production" && <+execution.steps.check_live_sev1_for_prod_release.output.outputVariables.ongoingLiveSev1> != null && <+execution.steps.check_live_sev1_for_prod_release.output.outputVariables.ongoingLiveSev1> == 'True' )
+          - step:
+              type: HarnessApproval
+              name: Deployment Approval
+              identifier: deployment_approval
+              spec:
+                approvalMessage: "<+(<+env.type> == \"Production\" && <+execution.steps. check_live_sev1_for_prod_release.output.outputVariables.ongoingLiveSev1> != null &&      <+execution.steps. check_live_sev1_for_prod_release.output.outputVariables.ongoingLiveSev1> == 'True') ? \"LIVE Sev. 1 Ongoing. Please be Careful to APPROVE.\": \"\"> Manual UI Approval for deploying to <+env.name> environment. Approving this will start the deployment. "
+                includePipelineExecutionHistory: true
+                isAutoRejectEnabled: false
+                approvers:
+                  userGroups: <+input>
+                  minimumCount: 1
+                  disallowPipelineExecutor: false
+                approverInputs: []
+              timeout: 3h
+              when:
+                stageStatus: Success
+                condition: ( <+serviceVariableOverrides.EnableTrueCD>!='True' && ( ( <+serviceVariableOverrides.EnableManualApprovalPostReleaseTicketApproval>=='True' && <+env.type> == "Production" ) || ( <+serviceVariableOverrides.TestConfigFilePath>==null && ( ( <+env.name> == "develop" && <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> == "hs_eks_spike_api_aps1" ) || ( <+env.name> == "qa" && ( <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.develop_infradef> != "null" || ( <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> != "null" && <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> != "" ) ) ) || ( <+env.name> == "preprod" && ( <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.develop_infradef> != "null" || <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.qa_infradef> != "null" || ( <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> != "null" && <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> != "" ) ) ) || ( <+env.name> == "staging" && <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.preprod_infradef> != "null" ) ) ) ) ) || ( <+env.type> == "Production" && <+execution.steps.check_live_sev1_for_prod_release.output.outputVariables.ongoingLiveSev1> != null && <+execution.steps.check_live_sev1_for_prod_release.output.outputVariables.ongoingLiveSev1> == 'True' )
+          - step:
+              name: Notify for Manual Approval for Pipeline Start
+              identifier: notify_for_manual_approval_of_pipeline_start
+              template:
+                templateRef: account.notification_template
+                versionLabel: "2"
+                templateInputs:
+                  type: ShellScript
+                  spec:
+                    environmentVariables:
+                      - name: notification_context
+                        type: String
+                        value: Provided UI Approval For Deployment Start
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - DelegateRestart
+                          - DelegateProvisioning
+                        action:
+                          type: Retry
+                          spec:
+                            retryCount: 3
+                            retryIntervals:
+                              - 1m
+                            onRetryFailure:
+                              action:
+                                type: MarkAsSuccess
+                  when:
+                    stageStatus: Success
+                    condition: <+serviceVariableOverrides.EnableTrueCD>!='True' && (<+serviceVariableOverrides.EnableTrueCD>!='True' && ((<+serviceVariableOverrides.EnableManualApprovalPostReleaseTicketApproval>=='True' && <+env.type> == "Production") || (<+serviceVariableOverrides.TestConfigFilePath>==null && (<+env.name> == "develop" && <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> == "hs_eks_spike_api_aps1" ) || (<+env.name> == "qa" && (<+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.develop_infradef> != "null" || (<+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> != "null" && <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> != ""))) || (<+env.name> == "preprod" && (<+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.develop_infradef> != "null" || <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.qa_infradef> != "null" || (<+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> != "null" && <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.spike_infradef> != ""))) || (<+env.name> == "staging" && <+pipeline.stages.deployment_setup.spec.execution.steps.export_infra_vars.output.outputVariables.preprod_infradef> != "null"))))
+          - stepGroup:
+              identifier: dds_schema_check
+              name: DDS Schema Check
+              steps:
+                - step:
+                    type: ShellScript
+                    name: Select Delegate
+                    identifier: select_delegate
+                    spec:
+                      shell: Bash
+                      onDelegate: true
+                      source:
+                        type: Inline
+                        spec:
+                          script: |-
+                            echo $HOSTNAME
+                            HOST_SELECTOR=$HOSTNAME
+                      environmentVariables: []
+                      outputVariables:
+                        - name: HOST_SELECTOR
+                          type: String
+                          value: HOST_SELECTOR
+                    timeout: 10m
+                - step:
+                    name: Pre Check CleanUp
+                    identifier: pre_check_cleanup
+                    template:
+                      templateRef: account.cleanup
+                      versionLabel: "1"
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: destination
+                              type: String
+                              value: <+variable.service_workspace_path>/dds
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_check.steps.select_delegate.output.outputVariables.HOST_SELECTOR>
+                        when:
+                          condition: "true"
+                          stageStatus: Success
+                - step:
+                    name: Hotstar Git Clone
+                    identifier: dds_check_repo_clone
+                    template:
+                      templateRef: account.hotstar_git_clone
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: RepoName
+                              type: String
+                              value: <+serviceVariableOverrides.RepoName>
+                            - name: Destination
+                              type: String
+                              value: <+variable.service_workspace_path>/dds/<+serviceVariableOverrides.RepoName>
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_check.steps.select_delegate.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                        when:
+                          condition: "true"
+                          stageStatus: Success
+                - step:
+                    name: Checkout Repo
+                    identifier: checkout_repo
+                    template:
+                      templateRef: account.checkout_repo
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: RepoDestination
+                              type: String
+                              value: <+variable.service_workspace_path>/dds/<+serviceVariableOverrides.RepoName>
+                            - name: CheckoutRef
+                              type: String
+                              value: <+stage.variables.CommitId>
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_check.steps.select_delegate.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                        when:
+                          condition: "true"
+                          stageStatus: Success
+                - step:
+                    name: Merge Schema
+                    identifier: merge_schema
+                    template:
+                      templateRef: account.merge_schema
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_check.steps.select_delegate.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                        when:
+                          condition: "true"
+                          stageStatus: Success
+                - step:
+                    name: Graphql Inspector V2
+                    identifier: graphql_inspector_v2
+                    template:
+                      templateRef: account.graphql_inspector
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_check.steps.select_delegate.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                        when:
+                          condition: "true"
+                          stageStatus: Success
+                - step:
+                    type: HarnessApproval
+                    identifier: breaking_schema_approval
+                    name: Breaking Schema Approval
+                    when:
+                      stageStatus: Success
+                      condition: <+execution.steps.dds_schema_check.steps.graphql_inspector_v2.output.outputVariables.isFailed>
+                    timeout: 3600s
+                    spec:
+                      includePipelineExecutionHistory: true
+                      approvers:
+                        userGroups: <+input>
+                        minimumCount: 1
+                        disallowPipelineExecutor: false
+                      approvalMessage: |-
+                        Schema is not backward compatible. It can easily be live issue if not checked with care.
+                        Please check with scrutiny in logs of Previous Step(Graphql Inspector V2), that changes are okay to go ahead.
+                        Only admin can approve these changes, please ask team lead or EM for the same.
+                      approverInputs: []
+                      isAutoRejectEnabled: false
+                - step:
+                    name: Schema Federation Check
+                    identifier: schema_federation_check
+                    template:
+                      templateRef: account.schema_federation_check
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_check.steps.select_delegate.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                        when:
+                          condition: "true"
+                          stageStatus: Success
+                - step:
+                    name: Post DDS Check CleanUp
+                    identifier: post_check_cleanup
+                    template:
+                      templateRef: account.cleanup
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: destination
+                              type: String
+                              value: <+variable.service_workspace_path>/dds
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_check.steps.select_delegate.output.outputVariables.HOST_SELECTOR>
+                        when:
+                          condition: "true"
+                          stageStatus: Success
+              when:
+                stageStatus: Success
+                condition: <+serviceVariableOverrides.DDSVaultPath> != null && <+serviceVariableOverrides.DDSVaultPath> != "null"
+              failureStrategies:
+                - onFailure:
+                    errors:
+                      - Authentication
+                      - Authorization
+                      - Connectivity
+                      - Timeout
+                      - Unknown
+                      - Verification
+                      - PolicyEvaluationFailure
+                      - InputTimeoutError
+                      - ApprovalRejection
+                    action:
+                      type: MarkAsFailure
+                - onFailure:
+                    errors:
+                      - DelegateProvisioning
+                      - DelegateRestart
+                    action:
+                      type: Retry
+                      spec:
+                        retryCount: 2
+                        retryIntervals:
+                          - 30s
+                        onRetryFailure:
+                          action:
+                            type: MarkAsFailure
+              spec: {}
+          - stepGroup:
+              identifier: terraform_phase
+              name: Terraform
+              steps:
+                - step:
+                    name: Generate Infra Configs
+                    identifier: generate_infra_configs
+                    template:
+                      templateRef: account.generate_infra_configs
+                      versionLabel: "3"
+                      templateInputs:
+                        type: ShellScript
+                        when:
+                          condition: (<+serviceVariableOverrides.SkipTerraform> == "False")&&<+serviceVariableOverrides.EnableIACTerraform> == "True"
+                - parallel:
+                    - step:
+                        type: TerraformPlan
+                        identifier: terraform_plan
+                        name: Terraform Plan
+                        when:
+                          stageStatus: Success
+                          condition: (<+serviceVariableOverrides.SkipTerraform> == "False")&&<+serviceVariableOverrides.EnableIACTerraform> != "True"
+                        timeout: 60m
+                        spec:
+                          configuration:
+                            command: Apply
+                            configFiles:
+                              store:
+                                spec:
+                                  connectorRef: account.hotstar
+                                  gitFetchType: Commit
+                                  commitId: <+artifact.tag.split('-')[2]>
+                                  folderPath: <+serviceVariableOverrides.TerraformRootDir>
+                                  repoName: <+serviceVariableOverrides.RepoName>
+                                type: Github
+                              moduleSource:
+                                useConnectorCredentials: true
+                            environmentVariables:
+                              - name: TERRAFORM_RUN_TIME_VAR_FILES
+                                value: <+serviceVariableOverrides.TerraformVarFilePath>
+                                type: String
+                              - name: GIT_REPO
+                                value: <+serviceVariableOverrides.RepoName>
+                                type: String
+                              - name: TERRAFORM_WORKSPACE
+                                value: <+serviceVariableOverrides.WorkspaceName>
+                                type: String
+                              - name: ENV_NAME
+                                value: <+env.name>
+                                type: String
+                              - name: SERVICE_NAME
+                                value: <+service.name>
+                                type: String
+                              - name: TERRAFORM_ROOT_DIR
+                                value: <+serviceVariableOverrides.TerraformRootDir>
+                                type: String
+                            varFiles:
+                              - varFile:
+                                  type: Remote
+                                  identifier: remote
+                                  spec:
+                                    store:
+                                      type: Github
+                                      spec:
+                                        gitFetchType: Commit
+                                        repoName: <+serviceVariableOverrides.RepoName>
+                                        commitId: <+artifact.tag.split('-')[2]>
+                                        paths:
+                                          - <+serviceVariableOverrides.TerraformVarFilePath>
+                                        connectorRef: account.hotstar
+                            secretManagerRef: <+<+serviceVariableOverrides.UseHarnessSecretManager>=="True"?'account.harnessSecretManager':'account.vault_terraform_plan'>
+                            workspace: <+serviceVariableOverrides.WorkspaceName>
+                            exportTerraformPlanJson: true
+                            skipStateStorage: true
+                            skipRefreshCommand: true
+                          provisionerIdentifier: <+service.identifier>_<+env.identifier.replace('.','_')>_<+infra.infraIdentifier>
+                    - step:
+                        type: TerraformPlan
+                        identifier: iac_terraform_plan
+                        name: Terraform Plan
+                        when:
+                          stageStatus: Success
+                          condition: (<+serviceVariableOverrides.SkipTerraform> == "False")&&<+serviceVariableOverrides.EnableIACTerraform> == "True"
+                        timeout: 60m
+                        spec:
+                          configuration:
+                            command: Apply
+                            configFiles:
+                              store:
+                                spec:
+                                  connectorRef: account.amazon_web_services
+                                  bucketName: cicd-helper
+                                  region: us-east-1
+                                  folderPath: <+execution.steps.terraform_phase.steps.generate_infra_configs.output.outputVariables.s3Path>
+                                type: S3
+                            providerCredential:
+                              type: Aws
+                              spec:
+                                connectorRef: account.amazon_web_services
+                                roleArn: ""
+                            environmentVariables:
+                              - name: TERRAFORM_RUN_TIME_VAR_FILES
+                                value: <+serviceVariableOverrides.TerraformVarFilePath>
+                                type: String
+                              - name: GIT_REPO
+                                value: <+serviceVariableOverrides.RepoName>
+                                type: String
+                              - name: TERRAFORM_WORKSPACE
+                                value: <+serviceVariableOverrides.WorkspaceName>
+                                type: String
+                              - name: ENV_NAME
+                                value: <+env.name>
+                                type: String
+                              - name: SERVICE_NAME
+                                value: <+service.name>
+                                type: String
+                              - name: TERRAFORM_ROOT_DIR
+                                value: <+serviceVariableOverrides.TerraformRootDir>
+                                type: String
+                            secretManagerRef: <+<+serviceVariableOverrides.UseHarnessSecretManager>=="True"?'account.harnessSecretManager':'account.vault_terraform_plan'>
+                            workspace: <+service.name>-<+env.name>
+                            exportTerraformPlanJson: true
+                            skipStateStorage: true
+                            skipRefreshCommand: true
+                          provisionerIdentifier: <+service.identifier>_<+env.identifier.replace('.','_')>_<+infra.infraIdentifier>
+                - step:
+                    name: Terraform Check Changes
+                    identifier: terraform_check_changes
+                    template:
+                      templateRef: account.terraform_check_changes
+                      versionLabel: "3"
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: account_defaults_InfraCostEnabled
+                              type: String
+                              value: <+variable.account.infra_cost_enabled>
+                            - name: totalMonthlyCost
+                              type: String
+                              value: totalMonthlyCost
+                        when:
+                          condition: (<+serviceVariableOverrides.SkipTerraform> == "False")&&<+steps.terraform_plan.plan.detailedExitCode>!=0 && <+steps.iac_terraform_plan.plan.detailedExitCode>!=0
+                - step:
+                    name: Notification For Infracost Approval
+                    identifier: notification_for_infracost_approval
+                    template:
+                      templateRef: account.notification_template
+                      versionLabel: "2"
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: notification_context
+                              type: String
+                              value: Paused for InfraCost/Terraform Approval
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - AllErrors
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: MarkAsSuccess
+                        when:
+                          stageStatus: Success
+                          condition: (<+serviceVariableOverrides.SkipTerraform> == "False")&&<+steps.terraform_plan.plan.detailedExitCode>!=0 && <+steps.iac_terraform_plan.plan.detailedExitCode>!=0
+                - step:
+                    type: JiraApproval
+                    identifier: cost_approval
+                    name: Cost Approval
+                    when:
+                      stageStatus: Success
+                      condition: (<+serviceVariableOverrides.SkipTerraform> == "False")&&!(<+execution.steps.terraformTerraform.steps.terraform_check_changes.output.outputVariables.jiraIssueId> == "null" || <+execution.steps.terraformTerraform.steps.terraform_check_changes.output.outputVariables.jiraIssueId> == "" || <+execution.steps.terraformTerraform.steps.terraform_check_changes.output.outputVariables.jiraIssueId> == null)
+                    timeout: 1d
+                    spec:
+                      connectorRef: account.hotstar_jira
+                      issueKey: <+stage.spec.execution.steps.terraformTerraform.steps.terraform_check_changes.output.outputVariables.jiraIssueId>
+                      projectKey: FIN
+                      approvalCriteria:
+                        type: KeyValues
+                        spec:
+                          matchAnyCondition: true
+                          conditions:
+                            - key: Status
+                              operator: equals
+                              value: Budget Approved
+                      rejectionCriteria:
+                        type: KeyValues
+                        spec:
+                          matchAnyCondition: true
+                          conditions:
+                            - key: Status
+                              operator: equals
+                              value: Not Approved
+                      issueType: Cost Approval
+                      retryInterval: 1m
+                - step:
+                    type: HarnessApproval
+                    identifier: terraform_apply_approval
+                    name: Terraform Apply Approval
+                    when:
+                      stageStatus: Success
+                      condition: (<+serviceVariableOverrides.SkipTerraform> == "False")&&(<+steps.terraform_plan.plan.detailedExitCode>!=0 && <+steps.iac_terraform_plan.plan.detailedExitCode>!=0 && (<+variable.allow_skip_infra_approval> != "True" || <+serviceVariableOverrides.SkipInfraApproval> != "True"))
+                    timeout: 3600s
+                    spec:
+                      includePipelineExecutionHistory: true
+                      approvers:
+                        userGroups: <+input>
+                        minimumCount: 1
+                        disallowPipelineExecutor: false
+                      approvalMessage: Please check the Terraform Plan step and then only approve. DO NOT APPROVE if the plan is not reviewed.
+                      approverInputs: []
+                      isAutoRejectEnabled: false
+                - step:
+                    name: Terraform Approval Notification
+                    identifier: terraform_approval_notification
+                    template:
+                      templateRef: account.notification_template
+                      versionLabel: "2"
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: notification_context
+                              type: String
+                              value: Provided UI Approval For Deployment Start
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: MarkAsSuccess
+                        when:
+                          stageStatus: Success
+                          condition: (<+serviceVariableOverrides.SkipTerraform> == "False")&&(<+steps.terraform_plan.plan.detailedExitCode>!=0  && <+steps.iac_terraform_plan.plan.detailedExitCode>!=0 && (<+variable.allow_skip_infra_approval> != "True" || <+serviceVariableOverrides.SkipInfraApproval> != "True"))
+                - step:
+                    type: TerraformApply
+                    identifier: terraform_apply
+                    name: Terraform Apply
+                    when:
+                      stageStatus: Success
+                      condition: (<+serviceVariableOverrides.SkipTerraform> == "False")&&(<+serviceVariableOverrides.SkipTerraformExport> == "False" || ( <+steps.terraform_plan.plan.detailedExitCode>!=0 && <+steps.iac_terraform_plan.plan.detailedExitCode>!=0 ))
+                    timeout: 1440m
+                    spec:
+                      configuration:
+                        type: InheritFromPlan
+                        encryptOutput:
+                          outputSecretManagerRef: account.harnessSecretManager
+                      provisionerIdentifier: <+service.identifier>_<+env.identifier.replace('.','_')>_<+infra.infraIdentifier>
+                - step:
+                    name: Terraform Export Output
+                    identifier: terraform_export_output
+                    template:
+                      templateRef: account.terraform_export_output
+                      versionLabel: "2"
+                      templateInputs:
+                        type: ShellScript
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                        when:
+                          condition: <+serviceVariableOverrides.SkipTerraformExport> == "False"
+              spec: {}
+              when:
+                stageStatus: Success
+                condition: ""
+          - stepGroup:
+              identifier: migration_phase
+              name: Migration
+              when:
+                stageStatus: Success
+                condition: "!(<+serviceVariableOverrides.MigrationScriptFilePath> == null || <+serviceVariableOverrides.MigrationScriptFilePath> == \"null\")"
+              steps:
+                - step:
+                    name: Run Migration Script
+                    identifier: run_migration_script
+                    template:
+                      templateRef: account.run_migration_script
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: ScriptFilePath
+                              type: String
+                              value: <+serviceVariableOverrides.MigrationScriptFilePath>
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                          - onFailure:
+                              errors:
+                                - AllErrors
+                              action:
+                                type: StageRollback
+                        when:
+                          condition: <+serviceVariableOverrides.MigrationScriptFilePath> != null && <+serviceVariableOverrides.MigrationScriptFilePath> != "null"
+          - stepGroup:
+              name: K8s Deployment
+              identifier: k8s_deployment_phase
+              steps:
+                - stepGroup:
+                    name: DryRun Step Group
+                    identifier: DryRun_Step_Group
+                    steps:
+                      - step:
+                          type: K8sDryRun
+                          name: Manifest DryRun
+                          identifier: Manifest_DryRun
+                          spec:
+                            encryptYamlOutput: false
+                          timeout: 10m
+                          when:
+                            stageStatus: Success
+                            condition: (<+serviceVariableOverrides.SkipK8sDryRun> != "True")
+                    strategy:
+                      matrix:
+                        overrideManifest: <+(<+serviceVariableOverrides.OverrideManifestFilePath>!=null && <+serviceVariableOverrides.OverrideManifestFilePath>!='null')?(<+<+serviceVariableOverrides.EnableSingularCanary>=='True'?[<+serviceVariableOverrides.OverrideManifestFilePath>]:<+serviceVariableOverrides.OverrideManifestFilePath.split(',')>>):['_null_']>
+                    variables:
+                      - name: OverrideManifestFilePath
+                        type: String
+                        value: <+matrix.overrideManifest>
+                        description: ""
+                        required: false
+                - stepGroup:
+                    identifier: canary_phase_group
+                    name: Canary Deploy
+                    when:
+                      stageStatus: Success
+                      condition: <+<+variable.skip_canary_for_all_env.split(',')>.contains(<+service.name>)> != true && ((<+stage.variables.SkipCanary> == "False" && <+env.type> == "Production") || (<+stage.variables.SkipCanary> == "True" && !<+pipeline.variables.StartDeploymentFrom>.contains("prod-") && <+env.type> == "Production") || (<+env.identifier>=="account.preprod" && <+serviceVariableOverrides.EnablePreProdCanary> == "True" && <+stage.variables.SkipCanary> == "False"))
+                    steps:
+                      - step:
+                          type: ShellScript
+                          name: ManifestValidation
+                          identifier: ManifestValidation
+                          spec:
+                            shell: Bash
+                            executionTarget: {}
+                            source:
+                              type: Inline
+                              spec:
+                                script: |-
+                                  set -e
+                                  export KUBECONFIG=${HARNESS_KUBE_CONFIG_PATH}
+
+                                  export workspace=$(uuidgen)
+
+                                  rm -rf $workspace
+                                  mkdir -p $workspace
+                                  cd $workspace
+                                  git clone --depth=1 git@github.com:hotstar/hs-k8s-app-inventory.git
+
+                                  export ServiceName=`yq -r '.app.name' $ManifestFilePath`
+                                  if [[ "<+serviceVariableOverrides.OverrideManifestFilePath>" != "null" && "<+serviceVariableOverrides.OverrideManifestFilePath>" != "_null_" && "<+serviceVariableOverrides.OverrideManifestFilePath>" != "" ]]; then
+                                    export OverrideServiceName=`yq -r '.app.name' <+serviceVariableOverrides.OverrideManifestFilePath>`
+                                    if [[ "$OverrideServiceName" != "null" && "$OverrideServiceName" != "" ]]; then
+                                      export ServiceName="$OverrideServiceName"
+                                    fi
+                                  fi
+                                  export APP_NAME="$ServiceName"
+
+
+                                  rm -rf manifest.yaml
+                                  cat > manifest.yaml <<EOF
+                                  <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.DryRun_Step_Group_0.steps.Manifest_DryRun.k8s.manifestDryRun>
+                                  EOF
+
+                                  echo "Manifest is $K8sManifest"
+                                  echo "namespace is <+infra.namespace>"
+                                  echo "data center is <+serviceVariables.DataCenter>"
+                                  echo "App Name is $APP_NAME"
+
+                                  if ! infra-deploy kubeValidate --datacenter "<+serviceVariables.DataCenter>" --app "$APP_NAME" --namespace "<+infra.namespace>"; then
+                                    echo "Kube validation failed. Please check with devops-oncall for incompatibilities in Canary-compatible resources or incorrect manifest setup."
+                                    exit 1
+                                  fi
+                                  rm -rf $workspace
+                            environmentVariables:
+                              - name: Params
+                                type: String
+                                value: "--dry-run"
+                              - name: K8sManifest
+                                type: String
+                                value: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.DryRun_Step_Group_0.steps.Manifest_DryRun.k8s.manifestDryRun>
+                            outputVariables: []
+                          timeout: 10m
+                          when:
+                            stageStatus: Success
+                            condition: (((<+serviceVariableOverrides.CanaryManifestValidation> != null && <+serviceVariableOverrides.CanaryManifestValidation> == 'True') || (<+serviceVariableOverrides.CanaryManifestValidation> == null && <+variable.account.CanaryManifestValidation> == 'True'))) && (<+serviceVariableOverrides.SkipK8sDryRun> != "True")
+                      - step:
+                          type: K8sCanaryDeploy
+                          identifier: canary_deploy_step
+                          name: Canary Deployment
+                          timeout: 86400s
+                          spec:
+                            instanceSelection:
+                              spec:
+                                percentage: <+<+serviceVariableOverrides.EnableControlledCanary>=="True"?1:<+serviceVariableOverrides.CanaryPercentage.split(',')[0]>>
+                              type: Percentage
+                            skipDryRun: false
+                          failureStrategies:
+                            - onFailure:
+                                errors:
+                                  - Connectivity
+                                  - DelegateProvisioning
+                                  - DelegateRestart
+                                action:
+                                  type: Retry
+                                  spec:
+                                    retryCount: 3
+                                    retryIntervals:
+                                      - 1m
+                                    onRetryFailure:
+                                      action:
+                                        type: StageRollback
+                            - onFailure:
+                                errors:
+                                  - AllErrors
+                                action:
+                                  type: StageRollback
+                      - step:
+                          name: Initial Canary Routes Config
+                          identifier: initial_canary_routes_config
+                          template:
+                            templateRef: account.canary_routes_config
+                            versionLabel: "4"
+                            templateInputs:
+                              type: ShellScript
+                              spec:
+                                environmentVariables:
+                                  - name: Weight
+                                    type: String
+                                    value: <+serviceVariableOverrides.CanaryPercentage.split(',')[0]>
+                                  - name: CanaryWorkload
+                                    type: String
+                                    value: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+strategy.node.canary_phase_group.identifierPostFix>.steps.canary_deploy_step.output.canaryWorkload>
+                              when:
+                                stageStatus: Success
+                                condition: <+serviceVariableOverrides.EnableControlledCanary>=="True"
+                              failureStrategies:
+                                - onFailure:
+                                    errors:
+                                      - DelegateProvisioning
+                                      - DelegateRestart
+                                    action:
+                                      type: Retry
+                                      spec:
+                                        retryCount: 3
+                                        retryIntervals:
+                                          - 1m
+                                        onRetryFailure:
+                                          action:
+                                            type: StageRollback
+                                - onFailure:
+                                    errors:
+                                      - AllErrors
+                                    action:
+                                      type: StageRollback
+                      - step:
+                          type: Barrier
+                          name: Sync Canary Deployment
+                          identifier: sync_canary_deployment
+                          spec:
+                            barrierRef: <+input>
+                          timeout: 30m
+                          when:
+                            stageStatus: Success
+                            condition: <+serviceVariableOverrides.SyncCanaryDeployments> == "True"
+                      - parallel:
+                          - step:
+                              name: Run Automation Suites
+                              identifier: run_verification_suites
+                              template:
+                                templateRef: account.run_verification_suites
+                                versionLabel: "2"
+                                gitBranch: master
+                                templateInputs:
+                                  type: ShellScript
+                                  failureStrategies:
+                                    - onFailure:
+                                        errors:
+                                          - DelegateProvisioning
+                                          - DelegateRestart
+                                        action:
+                                          type: Retry
+                                          spec:
+                                            retryCount: 3
+                                            retryIntervals:
+                                              - 1m
+                                            onRetryFailure:
+                                              action:
+                                                type: StageRollback
+                                    - onFailure:
+                                        errors:
+                                          - AllErrors
+                                        action:
+                                          type: StageRollback
+                                  when:
+                                    condition: ((<+serviceVariableOverrides.TestConfigFilePath> != null && <+serviceVariableOverrides.TestConfigFilePath> != 'null')) && (<+stepGroup.identifierPostFix> == "_0")
+                                  timeout: <+(<+serviceVariableOverrides.TestSuiteVerificationTimeout>!='' && <+serviceVariableOverrides.TestSuiteVerificationTimeout>!=null && <+serviceVariableOverrides.TestSuiteVerificationTimeout>!='null')?<+serviceVariableOverrides.TestSuiteVerificationTimeout>:'30m'>
+                          - step:
+                              type: Verify
+                              identifier: prometheus
+                              name: Prometheus Verification
+                              when:
+                                stageStatus: Success
+                                condition: <+variable.account.enable_metrics_verification> == 'True'
+                              spec:
+                                type: Canary
+                                spec:
+                                  sensitivity: MEDIUM
+                                  failOnNoAnalysis: false
+                                  type: Auto
+                                  deploymentTag: <+serviceConfig.artifacts.primary.tag>
+                                  duration: <+(<+serviceVariableOverrides.CanaryVerificationTime>!='' && <+serviceVariableOverrides.CanaryVerificationTime>!=null && <+serviceVariableOverrides.CanaryVerificationTime>!='null')?<+serviceVariableOverrides.CanaryVerificationTime>:'15m'>
+                                  shouldUseCDNodes: true
+                                isMultiServicesOrEnvs: false
+                                monitoredService:
+                                  type: Default
+                                  spec: {}
+                              timeout: 2h
+                              failureStrategies:
+                                - onFailure:
+                                    errors:
+                                      - DelegateProvisioning
+                                      - DelegateRestart
+                                    action:
+                                      type: Retry
+                                      spec:
+                                        retryCount: 3
+                                        retryIntervals:
+                                          - 1m
+                                        onRetryFailure:
+                                          action:
+                                            type: Ignore
+                                - onFailure:
+                                    errors:
+                                      - AllErrors
+                                    action:
+                                      type: Ignore
+                      - step:
+                          type: ShellScript
+                          name: Auto Promotion Decider
+                          identifier: auto_promotion_decider
+                          spec:
+                            shell: Bash
+                            executionTarget: {}
+                            source:
+                              type: Inline
+                              spec:
+                                script: |-
+                                  set -e
+                                  if [[ "<+steps.prometheus.status>" != "SUCCEEDED" ]]; then
+                                      exit 1
+                                  fi
+                            environmentVariables: []
+                            outputVariables: []
+                          timeout: 10m
+                          failureStrategies:
+                            - onFailure:
+                                errors:
+                                  - Connectivity
+                                  - DelegateProvisioning
+                                  - DelegateRestart
+                                action:
+                                  type: Retry
+                                  spec:
+                                    retryCount: 3
+                                    retryIntervals:
+                                      - 1m
+                                    onRetryFailure:
+                                      action:
+                                        type: StageRollback
+                            - onFailure:
+                                errors:
+                                  - AllErrors
+                                action:
+                                  type: StageRollback
+                          when:
+                            stageStatus: Success
+                            condition: <+serviceVariableOverrides.EnableTrueCD>=='True'
+                      - stepGroup:
+                          name: Scale Canary
+                          identifier: scale_canary_step_group
+                          steps:
+                            - step:
+                                type: HarnessApproval
+                                name: Scale Up Approval
+                                identifier: scale_up_approval
+                                spec:
+                                  approvalMessage: Approval to scale up canary further for the defined ladder
+                                  includePipelineExecutionHistory: true
+                                  approvers:
+                                    userGroups: <+input>
+                                    minimumCount: 1
+                                    disallowPipelineExecutor: false
+                                  approverInputs: []
+                                  isAutoRejectEnabled: false
+                                timeout: 1d
+                                failureStrategies:
+                                  - onFailure:
+                                      errors:
+                                        - AllErrors
+                                      action:
+                                        type: StageRollback
+                                when:
+                                  stageStatus: Success
+                                  condition: <+size(<+serviceVariableOverrides.CanaryPercentage.split(',')>)> gt 1 && <+serviceVariableOverrides.IncrementalCanaryApprovals> == "True" && <+serviceVariableOverrides.EnableTrueCD>!='True'
+                            - step:
+                                name: Get Current Replicas
+                                identifier: get_current_replicas
+                                template:
+                                  templateRef: account.get_current_replicas
+                                  versionLabel: "2"
+                              isContainerStepGroup: false
+                            - step:
+                                type: K8sScale
+                                name: Canary Scale Up
+                                identifier: scale_up_cananry
+                                spec:
+                                  workload: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+strategy.node.canary_phase_group.identifierPostFix>.steps.canary_deploy_step.output.canaryWorkload>
+                                  skipSteadyStateCheck: false
+                                  instanceSelection:
+                                    type: Count
+                                    spec:
+                                      count: <+steps.get_current_replicas.output.outputVariables.instances>
+                                timeout: 2h
+                                when:
+                                  stageStatus: Success
+                                failureStrategies:
+                                  - onFailure:
+                                      errors:
+                                        - DelegateProvisioning
+                                        - DelegateRestart
+                                      action:
+                                        type: Retry
+                                        spec:
+                                          retryCount: 3
+                                          retryIntervals:
+                                            - 1m
+                                          onRetryFailure:
+                                            action:
+                                              type: StageRollback
+                                  - onFailure:
+                                      errors:
+                                        - AllErrors
+                                      action:
+                                        type: StageRollback
+                            - step:
+                                name: Canary Routes Config
+                                identifier: canary_routes_config
+                                template:
+                                  templateRef: account.canary_routes_config
+                                  versionLabel: "4"
+                                  templateInputs:
+                                    type: ShellScript
+                                    spec:
+                                      environmentVariables:
+                                        - name: Weight
+                                          type: String
+                                          value: <+repeat.item>
+                                        - name: CanaryWorkload
+                                          type: String
+                                          value: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+strategy.node.canary_phase_group.identifierPostFix>.steps.canary_deploy_step.output.canaryWorkload>
+                                    when:
+                                      condition: <+serviceVariableOverrides.EnableControlledCanary>=="True"
+                                      stageStatus: Success
+                                    failureStrategies:
+                                      - onFailure:
+                                          errors:
+                                            - DelegateProvisioning
+                                            - DelegateRestart
+                                          action:
+                                            type: Retry
+                                            spec:
+                                              retryCount: 3
+                                              retryIntervals:
+                                                - 1m
+                                              onRetryFailure:
+                                                action:
+                                                  type: StageRollback
+                                      - onFailure:
+                                          errors:
+                                            - AllErrors
+                                          action:
+                                            type: StageRollback
+                            - step:
+                                type: Verify
+                                identifier: prometheus_scale_up
+                                name: Prometheus Verification
+                                when:
+                                  stageStatus: Success
+                                  condition: <+variable.account.enable_metrics_verification> == 'True'
+                                spec:
+                                  type: Canary
+                                  spec:
+                                    sensitivity: MEDIUM
+                                    failOnNoAnalysis: false
+                                    type: Auto
+                                    deploymentTag: <+serviceConfig.artifacts.primary.tag>
+                                    duration: <+(<+serviceVariableOverrides.CanaryVerificationTime>=='' || <+serviceVariableOverrides.CanaryVerificationTime>==null || <+serviceVariableOverrides.CanaryVerificationTime>=='null')?'15m':<+serviceVariableOverrides.CanaryVerificationTime>>
+                                    shouldUseCDNodes: true
+                                  isMultiServicesOrEnvs: false
+                                  monitoredService:
+                                    type: Default
+                                    spec: {}
+                                timeout: 2h
+                                failureStrategies:
+                                  - onFailure:
+                                      errors:
+                                        - DelegateRestart
+                                        - DelegateProvisioning
+                                      action:
+                                        type: Retry
+                                        spec:
+                                          retryCount: 3
+                                          retryIntervals:
+                                            - 1m
+                                          onRetryFailure:
+                                            action:
+                                              type: Ignore
+                                  - onFailure:
+                                      errors:
+                                        - AllErrors
+                                      action:
+                                        type: Ignore
+                            - step:
+                                type: ShellScript
+                                name: Auto Promotion  Decider
+                                identifier: auto_forward_decider
+                                spec:
+                                  shell: Bash
+                                  executionTarget: {}
+                                  source:
+                                    type: Inline
+                                    spec:
+                                      script: |-
+                                        set -e
+                                        if [[ "<+steps.prometheus_scale_up.status>" != "SUCCEEDED" ]]; then
+                                            exit 1
+                                        fi
+                                  environmentVariables: []
+                                  outputVariables: []
+                                timeout: 10m
+                                failureStrategies:
+                                  - onFailure:
+                                      errors:
+                                        - Authentication
+                                        - DelegateProvisioning
+                                        - DelegateRestart
+                                      action:
+                                        type: Retry
+                                        spec:
+                                          retryCount: 3
+                                          retryIntervals:
+                                            - 1m
+                                          onRetryFailure:
+                                            action:
+                                              type: StageRollback
+                                  - onFailure:
+                                      errors:
+                                        - AllErrors
+                                      action:
+                                        type: StageRollback
+                                when:
+                                  stageStatus: Success
+                                  condition: <+serviceVariableOverrides.EnableTrueCD>=='True'
+                          when:
+                            stageStatus: Success
+                          strategy:
+                            repeat:
+                              items: <+serviceVariableOverrides.CanaryPercentage.split(',',2)[1].split(',')>
+                              maxConcurrency: 1
+                            when: <+size(<+serviceVariableOverrides.CanaryPercentage.split(',')>)> gt 1
+                          spec: {}
+                          variables:
+                            - name: ReleaseIdentifier
+                              type: String
+                              value: <+strategy.node.canary_phase_group.identifierPostFix.replaceAll('_','-')>
+                              description: Do Not Modify. Used for release and rollbacks
+                              required: false
+                          failureStrategies:
+                            - onFailure:
+                                errors:
+                                  - DelegateProvisioning
+                                  - Connectivity
+                                  - DelegateRestart
+                                action:
+                                  type: Retry
+                                  spec:
+                                    retryCount: 3
+                                    retryIntervals:
+                                      - 1m
+                                    onRetryFailure:
+                                      action:
+                                        type: StageRollback
+                            - onFailure:
+                                errors:
+                                  - AllErrors
+                                action:
+                                  type: StageRollback
+                      - step:
+                          name: Notification for Canary Approval
+                          identifier: notification_for_canary_approval
+                          template:
+                            templateRef: account.notification_template
+                            versionLabel: "2"
+                            templateInputs:
+                              type: ShellScript
+                              spec:
+                                environmentVariables:
+                                  - name: notification_context
+                                    type: String
+                                    value: Paused for Canary Approval
+                              failureStrategies:
+                                - onFailure:
+                                    errors:
+                                      - AllErrors
+                                    action:
+                                      type: Retry
+                                      spec:
+                                        retryCount: 3
+                                        retryIntervals:
+                                          - 1m
+                                        onRetryFailure:
+                                          action:
+                                            type: MarkAsSuccess
+                              when:
+                                stageStatus: Success
+                                condition: <+serviceVariableOverrides.EnableTrueCD>!='True'
+                      - step:
+                          type: HarnessApproval
+                          name: Canary Delete Approval
+                          identifier: Canary_Delete_Approval
+                          spec:
+                            approvalMessage: Approve if canary deployment is okay and ready to be rolled out post deletion.
+                            includePipelineExecutionHistory: true
+                            isAutoRejectEnabled: false
+                            approvers:
+                              userGroups: <+input>
+                              minimumCount: 1
+                              disallowPipelineExecutor: false
+                            approverInputs: []
+                          timeout: <+(<+serviceVariableOverrides.RolloutApprovalTimeout>!='' && <+serviceVariableOverrides.RolloutApprovalTimeout>!=null && <+serviceVariableOverrides.RolloutApprovalTimeout>!='null')?<+serviceVariableOverrides.RolloutApprovalTimeout>:'1d'>
+                          when:
+                            stageStatus: Success
+                            condition: <+serviceVariableOverrides.EnableTrueCD>!='True'
+                          failureStrategies:
+                            - onFailure:
+                                errors:
+                                  - AllErrors
+                                action:
+                                  type: StageRollback
+                      - stepGroup:
+                          name: Decrease Canary Traffic
+                          identifier: decrease_canary_traffic
+                          steps:
+                            - step:
+                                name: Scale Down
+                                identifier: scale_down
+                                template:
+                                  templateRef: account.canary_routes_config
+                                  versionLabel: "4"
+                                  templateInputs:
+                                    type: ShellScript
+                                    spec:
+                                      environmentVariables:
+                                        - name: Weight
+                                          type: String
+                                          value: <+serviceVariableOverrides.CanaryPercentage.split(',')[<+size(<+serviceVariableOverrides.CanaryPercentage.split(',')>)>-<+strategy.iteration>-2]>
+                                        - name: CanaryWorkload
+                                          type: String
+                                          value: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+strategy.node.canary_phase_group.identifierPostFix>.steps.canary_deploy_step.output.canaryWorkload>
+                                    when:
+                                      stageStatus: Success
+                                    failureStrategies:
+                                      - onFailure:
+                                          errors:
+                                            - Connectivity
+                                            - DelegateProvisioning
+                                            - DelegateRestart
+                                          action:
+                                            type: Retry
+                                            spec:
+                                              retryCount: 3
+                                              retryIntervals:
+                                                - 1m
+                                              onRetryFailure:
+                                                action:
+                                                  type: StageRollback
+                                      - onFailure:
+                                          errors:
+                                            - AllErrors
+                                          action:
+                                            type: StageRollback
+                            - step:
+                                type: Wait
+                                name: Cooldown Period
+                                identifier: Cooldown_Period
+                                spec:
+                                  duration: <+(<+serviceVariableOverrides.CanaryVerificationTime>=='' || <+serviceVariableOverrides.CanaryScaleDownWaitDuration>==null || <+serviceVariableOverrides.CanaryScaleDownWaitDuration>=='null')?'10m':<+serviceVariableOverrides.CanaryScaleDownWaitDuration>>
+                                failureStrategies:
+                                  - onFailure:
+                                      errors:
+                                        - DelegateProvisioning
+                                        - Connectivity
+                                        - DelegateRestart
+                                      action:
+                                        type: Retry
+                                        spec:
+                                          retryCount: 3
+                                          onRetryFailure:
+                                            action:
+                                              type: StageRollback
+                                          retryIntervals:
+                                            - 1m
+                                  - onFailure:
+                                      errors:
+                                        - AllErrors
+                                      action:
+                                        type: StageRollback
+                          strategy:
+                            repeat:
+                              times: <+size(<+serviceVariableOverrides.CanaryPercentage.split(',')>)-1>
+                              maxConcurrency: 1
+                            when: <+serviceVariableOverrides.EnableControlledCanary>=="True"
+                          when:
+                            stageStatus: Success
+                            condition: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+strategy.node.canary_phase_group.identifierPostFix>.steps.scale_canary_step_group_<+<+<+size(<+serviceVariableOverrides.CanaryPercentage.split(',')>)-2>-<+strategy.iteration>>.toString()>.steps.canary_routes_config.status> == "SUCCEEDED"
+                          failureStrategies:
+                            - onFailure:
+                                errors:
+                                  - Connectivity
+                                  - DelegateProvisioning
+                                  - DelegateRestart
+                                action:
+                                  type: Retry
+                                  spec:
+                                    retryCount: 3
+                                    retryIntervals:
+                                      - 1m
+                                    onRetryFailure:
+                                      action:
+                                        type: StageRollback
+                            - onFailure:
+                                errors:
+                                  - AllErrors
+                                action:
+                                  type: StageRollback
+                      - step:
+                          name: Canary Routes Scale Down
+                          identifier: canary_routes_scale_down
+                          template:
+                            templateRef: account.canary_routes_config
+                            versionLabel: "4"
+                            templateInputs:
+                              type: ShellScript
+                              spec:
+                                environmentVariables:
+                                  - name: Weight
+                                    type: String
+                                    value: "0"
+                                  - name: CanaryWorkload
+                                    type: String
+                                    value: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+strategy.node.canary_phase_group.identifierPostFix>.steps.canary_deploy_step.output.canaryWorkload>
+                              when:
+                                condition: <+serviceVariableOverrides.EnableControlledCanary>=="True"
+                                stageStatus: Success
+                              failureStrategies:
+                                - onFailure:
+                                    errors:
+                                      - DelegateRestart
+                                      - DelegateProvisioning
+                                    action:
+                                      type: Retry
+                                      spec:
+                                        retryCount: 3
+                                        retryIntervals:
+                                          - 1m
+                                        onRetryFailure:
+                                          action:
+                                            type: StageRollback
+                                - onFailure:
+                                    errors:
+                                      - AllErrors
+                                    action:
+                                      type: StageRollback
+                      - step:
+                          type: K8sCanaryDelete
+                          name: Delete K8s Canary
+                          identifier: k8s_canary_delete
+                          spec: {}
+                          timeout: 10m
+                      - step:
+                          name: Canary Service Deletion
+                          identifier: canary_service_deletion
+                          template:
+                            templateRef: account.canary_service_deletion
+                            versionLabel: "4"
+                            templateInputs:
+                              type: ShellScript
+                              spec:
+                                environmentVariables:
+                                  - name: CanaryWorkload
+                                    type: String
+                                    value: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+strategy.node.canary_phase_group.identifierPostFix>.steps.canary_deploy_step.output.canaryWorkload>
+                              when:
+                                condition: "true"
+                                stageStatus: Success
+                              failureStrategies:
+                                - onFailure:
+                                    errors:
+                                      - DelegateRestart
+                                      - DelegateProvisioning
+                                    action:
+                                      type: Retry
+                                      spec:
+                                        retryCount: 3
+                                        retryIntervals:
+                                          - 1m
+                                        onRetryFailure:
+                                          action:
+                                            type: StageRollback
+                                - onFailure:
+                                    errors:
+                                      - AllErrors
+                                    action:
+                                      type: StageRollback
+                    strategy:
+                      matrix:
+                        overrideManifest: <+(<+serviceVariableOverrides.OverrideManifestFilePath>!=null && <+serviceVariableOverrides.OverrideManifestFilePath>!='null')?(<+<+serviceVariableOverrides.EnableSingularCanary>=='True'?[<+serviceVariableOverrides.OverrideManifestFilePath>]:<+serviceVariableOverrides.OverrideManifestFilePath.split(',')>>):['_null_']>
+                        maxConcurrency: <+(<+serviceVariableOverrides.MaxConcurrentRollouts>!='' && <+serviceVariableOverrides.MaxConcurrentRollouts>!=null && <+serviceVariableOverrides.MaxConcurrentRollouts>!='null')?<+serviceVariableOverrides.MaxConcurrentRollouts>:100>
+                    variables:
+                      - name: AdditionalParameters
+                        type: String
+                        value: <+<+serviceVariableOverrides.EnableControlledCanary>=="True"?"--hpaUpdate=false --create-canary=true":"--hpaUpdate=false --harnessCanary=true">
+                        description: ""
+                        required: false
+                      - name: OverrideManifestFilePath
+                        type: String
+                        value: <+matrix.overrideManifest>
+                        description: ""
+                        required: false
+                      - name: ReleaseIdentifier
+                        type: String
+                        value: <+stepGroup.identifierPostFix.replaceAll('_','-')>
+                        description: Do not modify. used for managing the release and rollback
+                        required: false
+                - stepGroup:
+                    identifier: rollout_phase
+                    name: Rollout Deploy
+                    steps:
+                      - step:
+                          type: HarnessApproval
+                          name: Fleet Rollout Approval
+                          identifier: fleet_rollout_approval
+                          spec:
+                            approvalMessage: Approving this would start deployment for <+matrix.overrideManifest>
+                            includePipelineExecutionHistory: true
+                            isAutoRejectEnabled: false
+                            approvers:
+                              userGroups: <+input>
+                              minimumCount: 1
+                              disallowPipelineExecutor: false
+                            approverInputs: []
+                          timeout: "<+(<+serviceVariableOverrides.ApprovalWaitTimeForMultiFleetRollout>!=null && <+serviceVariableOverrides.ApprovalWaitTimeForMultiFleetRollout>!='null') ? <+serviceVariableOverrides.ApprovalWaitTimeForMultiFleetRollout> : \"60d\" >"
+                          when:
+                            stageStatus: Success
+                            condition: <+serviceVariableOverrides.EnableManualApprovalForMultiFleetRollout>=='True' && <+serviceVariables.OverrideManifestFilePath>!=null && <+serviceVariables.OverrideManifestFilePath>!='null' && (<+size(<+serviceVariables.OverrideManifestFilePath.split(',')>)> gt 1)
+                          failureStrategies:
+                            - onFailure:
+                                errors:
+                                  - DelegateProvisioning
+                                  - DelegateRestart
+                                  - Connectivity
+                                action:
+                                  type: Retry
+                                  spec:
+                                    retryCount: 3
+                                    retryIntervals:
+                                      - 1m
+                                    onRetryFailure:
+                                      action:
+                                        type: StageRollback
+                            - onFailure:
+                                errors:
+                                  - AllErrors
+                                action:
+                                  type: StageRollback
+                      - step:
+                          type: K8sRollingDeploy
+                          identifier: rollout_deployment
+                          name: Rollout Deployment
+                          timeout: 1440m
+                          spec:
+                            skipDryRun: false
+                            pruningEnabled: <+<+serviceVariableOverrides.EnableExcessiveResourcePruning>==null?false:<+serviceVariableOverrides.EnableExcessiveResourcePruning.equalsIgnoreCase('true')>>
+                          failureStrategies:
+                            - onFailure:
+                                errors:
+                                  - DelegateRestart
+                                  - DelegateProvisioning
+                                action:
+                                  type: Retry
+                                  spec:
+                                    retryCount: 3
+                                    retryIntervals:
+                                      - 1m
+                                    onRetryFailure:
+                                      action:
+                                        type: StageRollback
+                            - onFailure:
+                                errors:
+                                  - AllErrors
+                                action:
+                                  type: StageRollback
+                    strategy:
+                      matrix:
+                        overrideManifest: <+(<+serviceVariableOverrides.OverrideManifestFilePath>!=null && <+serviceVariableOverrides.OverrideManifestFilePath>!='null')?(<+<+serviceVariableOverrides.EnableSingularCanary>=='True'?[<+serviceVariableOverrides.OverrideManifestFilePath>]:<+serviceVariableOverrides.OverrideManifestFilePath.split(',')>>):['_null_']>
+                        maxConcurrency: <+(<+serviceVariableOverrides.MaxConcurrentRollouts>!='' && <+serviceVariableOverrides.MaxConcurrentRollouts>!=null && <+serviceVariableOverrides.MaxConcurrentRollouts>!='null')?<+serviceVariableOverrides.MaxConcurrentRollouts>:100>
+                    variables:
+                      - name: OverrideManifestFilePath
+                        type: String
+                        value: <+matrix.overrideManifest>
+                        description: ""
+                        required: false
+                      - name: ReleaseIdentifier
+                        type: String
+                        value: <+stepGroup.identifierPostFix.replaceAll('_','-')>
+                        description: Do Not Modify. Used for the release and rollback
+                        required: false
+              when:
+                stageStatus: Success
+                condition: <+serviceVariableOverrides.SkipK8sDeployment> != "True"
+              spec: {}
+              failureStrategies:
+                - onFailure:
+                    errors:
+                      - DelegateRestart
+                      - Connectivity
+                      - DelegateProvisioning
+                    action:
+                      type: Retry
+                      spec:
+                        retryCount: 3
+                        onRetryFailure:
+                          action:
+                            type: StageRollback
+                        retryIntervals:
+                          - 1m
+                - onFailure:
+                    errors:
+                      - AllErrors
+                    action:
+                      type: StageRollback
+          - stepGroup:
+              identifier: dds_schema_upload_phase
+              name: DDS Schema Upload
+              steps:
+                - step:
+                    type: ShellScript
+                    name: Select Delegate
+                    identifier: select_delegate_upload
+                    spec:
+                      shell: Bash
+                      onDelegate: true
+                      source:
+                        type: Inline
+                        spec:
+                          script: |-
+                            echo $HOSTNAME
+                            HOST_SELECTOR=$HOSTNAME
+                      environmentVariables: []
+                      outputVariables:
+                        - name: HOST_SELECTOR
+                          type: String
+                          value: HOST_SELECTOR
+                    timeout: 10m
+                - step:
+                    name: Schema Upload CleanUp
+                    identifier: cleanup
+                    template:
+                      templateRef: account.cleanup
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: destination
+                              type: String
+                              value: <+variable.service_workspace_path>/dds
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        when:
+                          condition: <+serviceVariableOverrides.DDSVaultPath> != null && <+serviceVariableOverrides.DDSVaultPath> != "null"
+                          stageStatus: Success
+                - step:
+                    name: Hotstar Git Clone
+                    identifier: dds_repo_clone
+                    template:
+                      templateRef: account.hotstar_git_clone
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: RepoName
+                              type: String
+                              value: <+serviceVariableOverrides.RepoName>
+                            - name: Destination
+                              type: String
+                              value: <+variable.service_workspace_path>/dds/<+serviceVariableOverrides.RepoName>
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                        when:
+                          condition: "true"
+                          stageStatus: Success
+                - step:
+                    name: Checkout Repo
+                    identifier: checkout_repo
+                    template:
+                      templateRef: account.checkout_repo
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: RepoDestination
+                              type: String
+                              value: <+variable.service_workspace_path>/dds/<+serviceVariableOverrides.RepoName>
+                            - name: CheckoutRef
+                              type: String
+                              value: <+stage.variables.CommitId>
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                        when:
+                          condition: "true"
+                          stageStatus: Success
+                - step:
+                    name: Merge Schema
+                    identifier: merge_schema
+                    template:
+                      templateRef: account.merge_schema
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                        when:
+                          condition: "true"
+                          stageStatus: Success
+                - step:
+                    name: Check Commits
+                    identifier: check_commits
+                    template:
+                      templateRef: account.check_commits
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                        when:
+                          condition: "true"
+                - step:
+                    type: HarnessApproval
+                    identifier: approval
+                    name: Commit Mismatch Approval
+                    when:
+                      stageStatus: Success
+                      condition: <+execution.steps.dds_schema_upload_phase.steps.check_commits.output.outputVariables.isFailed> == 1
+                    timeout: 3600s
+                    spec:
+                      includePipelineExecutionHistory: true
+                      approvers:
+                        userGroups: <+input>
+                        minimumCount: 1
+                        disallowPipelineExecutor: false
+                      approvalMessage: |-
+                        Commit that is being deployed via upload and the artifact in k8s are not from same commit. 
+                        Please be ABSOLUTELY SURE that it is fine to move forward.
+                        Ignoring this can cause a live issue.
+                      approverInputs: []
+                      isAutoRejectEnabled: false
+                    failureStrategies:
+                      - onFailure:
+                          errors:
+                            - AllErrors
+                          action:
+                            type: StageRollback
+                - step:
+                    name: Schema Federation Check
+                    identifier: schema_federation_check
+                    template:
+                      templateRef: account.schema_federation_check
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                        when:
+                          condition: "true"
+                          stageStatus: Success
+                - step:
+                    name: Schema Upload
+                    identifier: schema_upload
+                    template:
+                      templateRef: account.schema_upload
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateRestart
+                                - DelegateProvisioning
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                        when:
+                          condition: "true"
+                          stageStatus: Success
+                - step:
+                    name: Upload supergraph to S3 bucket
+                    identifier: upload_supergraph_to_s3_bucket
+                    template:
+                      templateRef: account.upload_supergraph_to_s3_bucket
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - AllErrors
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: Ignore
+                        when:
+                          condition: "true"
+                          stageStatus: Success
+              when:
+                stageStatus: Success
+                condition: <+serviceVariableOverrides.DDSVaultPath> != null && <+serviceVariableOverrides.DDSVaultPath> != "null"
+              failureStrategies: []
+              spec: {}
+          - stepGroup:
+              identifier: rollout_verify_phase
+              name: QA Verification
+              steps:
+                - step:
+                    name: Run Automation Suites
+                    identifier: run_verification_suites
+                    template:
+                      templateRef: account.run_verification_suites
+                      versionLabel: "2"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - DelegateProvisioning
+                                - DelegateRestart
+                              action:
+                                type: Retry
+                                spec:
+                                  retryCount: 3
+                                  retryIntervals:
+                                    - 1m
+                                  onRetryFailure:
+                                    action:
+                                      type: StageRollback
+                          - onFailure:
+                              errors:
+                                - AllErrors
+                              action:
+                                type: StageRollback
+                        when:
+                          condition: (<+serviceVariableOverrides.TestConfigFilePath> != null && <+serviceVariableOverrides.TestConfigFilePath> != 'null') && !(<+pipeline.variables.SkipTestExecution> == "True" && <+pipeline.variables.StartDeploymentFrom>.contains("prod-") && <+env.type> == "Production")
+                        timeout: <+(<+serviceVariableOverrides.TestSuiteVerificationTimeout>!='' && <+serviceVariableOverrides.TestSuiteVerificationTimeout>!=null && <+serviceVariableOverrides.TestSuiteVerificationTimeout>!='null')?<+serviceVariableOverrides.TestSuiteVerificationTimeout>:'30m'>
+          - stepGroup:
+              identifier: wrap_up
+              name: Wrap Up
+              steps:
+                - stepGroup:
+                    name: Alerts Cleanup
+                    identifier: alerts_cleanup_group
+                    steps:
+                      - step:
+                          name: Alerts Cleanup
+                          identifier: alerts_cleanup
+                          template:
+                            templateRef: account.prometheusalerts_deletion
+                            versionLabel: "1"
+                            templateInputs:
+                              type: ShellScript
+                              when:
+                                stageStatus: Success
+                                condition: <+variable.account.enable_alerts_cleanup> == 'True' && <+serviceVariableOverrides.EnableAlertsCleanup> == 'True' && <+env.type> == "Production"
+                              failureStrategies:
+                                - onFailure:
+                                    errors:
+                                      - Connectivity
+                                      - DelegateProvisioning
+                                      - DelegateRestart
+                                    action:
+                                      type: Retry
+                                      spec:
+                                        retryCount: 3
+                                        retryIntervals:
+                                          - 1m
+                                        onRetryFailure:
+                                          action:
+                                            type: Ignore
+                    strategy:
+                      matrix:
+                        overrideManifest: <+(<+serviceVariableOverrides.OverrideManifestFilePath>!=null && <+serviceVariableOverrides.OverrideManifestFilePath>!='null')?(<+<+serviceVariableOverrides.EnableSingularCanary>=='True'?[<+serviceVariableOverrides.OverrideManifestFilePath>]:<+serviceVariableOverrides.OverrideManifestFilePath.split(',')>>):['_null_']>
+                    variables:
+                      - name: OverrideManifestFilePath
+                        type: String
+                        value: <+matrix.overrideManifest>
+                        description: ""
+                        required: false
+                      - name: ReleaseIdentifier
+                        type: String
+                        value: <+stepGroup.identifierPostFix.replaceAll('_','-')>
+                        description: Used for managing the release object, please do not modify if not absolutely sure
+                        required: false
+                    when:
+                      stageStatus: Success
+                      condition: <+variable.account.enable_alerts_cleanup> == 'True' && <+serviceVariableOverrides.EnableAlertsCleanup> == 'True' && <+env.type> == "Production"
+                - step:
+                    name: Post Deployment Complition Script
+                    identifier: post_deployment_complition_script
+                    template:
+                      templateRef: account.run_migration_script
+                      versionLabel: "1"
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: ScriptFilePath
+                              type: String
+                              value: <+serviceVariableOverrides.PostDeploymentComplitionFilePath>
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - AllErrors
+                              action:
+                                type: MarkAsSuccess
+                        when:
+                          condition: "<+serviceVariableOverrides.PostDeploymentComplitionFilePath> != \"null\" && <+serviceVariableOverrides.PostDeploymentComplitionFilePath> != null "
+                - step:
+                    name: Schema Upload CleanUp
+                    identifier: cleanup
+                    template:
+                      templateRef: account.cleanup
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: destination
+                              type: String
+                              value: <+variable.service_workspace_path>/dds
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        when:
+                          condition: <+serviceVariableOverrides.DDSVaultPath> != null && <+serviceVariableOverrides.DDSVaultPath> != "null"
+                          stageStatus: Success
+                - step:
+                    name: Coralogix-tag
+                    identifier: coralogix_tag
+                    template:
+                      templateRef: account.coralogix_tag
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        failureStrategies:
+                          - onFailure:
+                              errors:
+                                - AllErrors
+                              action:
+                                type: Ignore
+                        when:
+                          condition: <+serviceVariableOverrides.SkipK8sDeployment> != "True"
+              failureStrategies:
+                - onFailure:
+                    errors:
+                      - AllErrors
+                    action:
+                      type: Ignore
+              spec: {}
+              when:
+                stageStatus: Success
+          - step:
+              name: Enable Prod Deployment Freeze
+              identifier: enable_prod_deployment_freeze
+              template:
+                templateRef: account.enable_prod_deployment_freeze
+                versionLabel: "1"
+          - step:
+              name: Notification for Stage Success
+              identifier: notification_for_stage_success
+              template:
+                templateRef: account.notification_template
+                versionLabel: "2"
+                templateInputs:
+                  type: ShellScript
+                  spec:
+                    environmentVariables:
+                      - name: notification_context
+                        type: String
+                        value: Stage Success Notification
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: Retry
+                          spec:
+                            retryCount: 3
+                            retryIntervals:
+                              - 1m
+                            onRetryFailure:
+                              action:
+                                type: MarkAsSuccess
+                  when:
+                    stageStatus: Success
+        rollbackSteps:
+          - step:
+              type: ShellScript
+              name: export_tag
+              identifier: export_tag
+              spec:
+                shell: Bash
+                executionTarget: {}
+                source:
+                  type: Inline
+                  spec:
+                    script: |
+
+                      echo "Terraform - <+pipeline.stages.<+stage.identifier>.spec.execution.steps.terraform_phase.status>"
+                      echo "DDS Check - <+pipeline.stages.<+stage.identifier>.spec.execution.steps.dds_schema_check.status>"
+                      echo "Migration - <+pipeline.stages.<+stage.identifier>.spec.execution.steps.migration_phase.status>"
+                      echo "Canary - <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group_0.status>"
+                      echo "Rollout - <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.rollout_phase_0.status>"
+                      echo "DDS Upload - <+pipeline.stages.<+stage.identifier>.spec.execution.steps.dds_schema_upload_phase.status>"
+                      echo "Test - <+pipeline.stages.<+stage.identifier>.spec.execution.steps.rollout_verify_phase.status>"
+                      echo "Wrap Up - <+pipeline.stages.<+stage.identifier>.spec.execution.steps.wrap_up.status>"
+
+                      if [[ "<+pipeline.stages.<+stage.identifier>.spec.execution.steps.dds_schema_check.status>" == "FAILED"  ]]; then
+                        export failedStepGroup="DDS-Schema-Check"
+                      elif [[ "<+pipeline.stages.<+stage.identifier>.spec.execution.steps.terraform_phase.status>" == "FAILED"  ]]; then
+                        export failedStepGroup="Terraform"
+                      elif [[ "<+pipeline.stages.<+stage.identifier>.spec.execution.steps.migration_phase.status>" == "FAILED"  ]]; then
+                        export failedStepGroup="Migration"
+                      elif [[ "<+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group_0.status>" == "FAILED"  ]]; then
+                        export failedStepGroup="Canary-Deployment"
+                      elif [[ "<+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.rollout_phase_0.status>" == "FAILED"  ]]; then
+                        export failedStepGroup="Rollout-Deployment"
+                      elif [[ "<+pipeline.stages.<+stage.identifier>.spec.execution.steps.dds_schema_upload_phase.status>" == "FAILED"  ]]; then
+                        export failedStepGroup="DDS-Schema-Upload"
+                      elif [[ "<+pipeline.stages.<+stage.identifier>.spec.execution.steps.rollout_verify_phase.status>" == "FAILED"  ]]; then
+                        export failedStepGroup="Verification"
+                      elif [[ "<+pipeline.stages.<+stage.identifier>.spec.execution.steps.wrap_up.status>" == "FAILED"  ]]; then
+                        export failedStepGroup="WrapUp"
+                      else
+                        export failedStepGroup="OtherFailure"
+                      fi
+                environmentVariables: []
+                outputVariables:
+                  - name: failedStepGroup
+                    type: String
+                    value: failedStepGroup
+              timeout: 10m
+          - step:
+              name: Notification for Stage Failure
+              identifier: notification_for_stage_failure
+              template:
+                templateRef: account.notification_template
+                versionLabel: "2"
+                gitBranch: master
+                templateInputs:
+                  type: ShellScript
+                  spec:
+                    environmentVariables:
+                      - name: notification_context
+                        type: String
+                        value: Notification for Pipeline Failure
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: Retry
+                          spec:
+                            retryCount: 3
+                            retryIntervals:
+                              - 1m
+                            onRetryFailure:
+                              action:
+                                type: MarkAsSuccess
+                  when:
+                    stageStatus: All
+          - stepGroup:
+              identifier: rollback_rollout_deploy
+              name: Rollback DDS
+              steps:
+                - step:
+                    name: Checkout Rollback Artifact
+                    identifier: checkout_rollback_artifact
+                    template:
+                      templateRef: account.checkout_rollback_artifact
+                      versionLabel: "2"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies: []
+                        when:
+                          condition: "true"
+                          stageStatus: All
+                - step:
+                    name: Merge Schema V2
+                    identifier: merge_schema_v2
+                    template:
+                      templateRef: account.merge_schema
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies: []
+                        when:
+                          condition: "true"
+                          stageStatus: All
+                - step:
+                    name: Graphql Inspector
+                    identifier: graphql_inspector
+                    template:
+                      templateRef: account.graphql_inspector
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies: []
+                        when:
+                          condition: "true"
+                          stageStatus: All
+                - step:
+                    type: HarnessApproval
+                    identifier: dds_rollback_approval
+                    name: Breaking Upload pproval
+                    when:
+                      stageStatus: Success
+                      condition: "!(0 == 0 || 0 == 0)"
+                    timeout: 1800s
+                    spec:
+                      includePipelineExecutionHistory: true
+                      approvers:
+                        userGroups: <+input>
+                        minimumCount: 1
+                        disallowPipelineExecutor: false
+                      approvalMessage: |-
+                        Schema is not backward compatible. It can easily be live issue if not checked with care.
+                        Please check with scrutiny in logs of Previous Step(Graphql Inspector), that rollback changes are okay to go ahead.
+                        Only admin can approve these changes, please ask team lead or EM for the same.
+                      isAutoRejectEnabled: false
+                      approverInputs: []
+                - step:
+                    name: Schema Federation Check
+                    identifier: schema_federation_check
+                    template:
+                      templateRef: account.schema_federation_check
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies: []
+                        when:
+                          condition: "true"
+                          stageStatus: All
+                - step:
+                    identifier: schema_upload
+                    name: Schema Upload
+                    template:
+                      templateRef: account.schema_upload
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        failureStrategies: []
+                        when:
+                          condition: "true"
+                          stageStatus: All
+                - step:
+                    identifier: cleanup
+                    name: CleanUp
+                    template:
+                      templateRef: account.cleanup
+                      templateInputs:
+                        type: ShellScript
+                        spec:
+                          environmentVariables:
+                            - name: destination
+                              type: String
+                              value: <+variable.service_workspace_path>/dds
+                          delegateSelectors:
+                            - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                        when:
+                          condition: ((<+serviceVariableOverrides.EndgameTags> == null || <+serviceVariableOverrides.EndgameTags> == 'null') && (<+serviceVariableOverrides.EndgameE2ETags> == null || <+serviceVariableOverrides.EndgameE2ETags> == 'null')) || (<+stage.variables.SkipCanary> == "True")
+                          stageStatus: All
+              when:
+                stageStatus: All
+                condition: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.dds_schema_upload_phase.steps.schema_upload.output.outputVariables.isschema_uploaded> == "True" && <+serviceVariableOverrides.DDSVaultPath> != null && <+serviceVariableOverrides.DDSVaultPath> != "null"
+          - stepGroup:
+              name: Rollback K8s Deploy
+              identifier: rollback_k8s_deploy_phase
+              steps:
+                - stepGroup:
+                    name: Rollabck Rollout
+                    identifier: rollabck_rollout_phase
+                    steps:
+                      - step:
+                          type: K8sRollingRollback
+                          identifier: rollback_deployment_step
+                          name: Rollback Deployment
+                          timeout: 1440m
+                          spec:
+                            pruningEnabled: <+<+serviceVariableOverrides.EnableExcessiveResourcePruning>==null?false:<+serviceVariableOverrides.EnableExcessiveResourcePruning.equalsIgnoreCase('true')>>
+                    strategy:
+                      matrix:
+                        overrideManifest: <+(<+serviceVariableOverrides.OverrideManifestFilePath>!=null && <+serviceVariableOverrides.OverrideManifestFilePath>!='null')?(<+<+serviceVariableOverrides.EnableSingularCanary>=='True'?[<+serviceVariableOverrides.OverrideManifestFilePath>]:<+serviceVariableOverrides.OverrideManifestFilePath.split(',')>>):['_null_']>
+                    variables:
+                      - name: OverrideManifestFilePath
+                        type: String
+                        value: <+matrix.overrideManifest>
+                        description: ""
+                        required: false
+                      - name: ReleaseIdentifier
+                        type: String
+                        value: <+stepGroup.identifierPostFix.replaceAll('_','-')>
+                        description: ""
+                        required: false
+                - stepGroup:
+                    name: Canary Rollback
+                    identifier: rollback_canary_phase_group
+                    steps:
+                      - stepGroup:
+                          name: Scale Down Canary
+                          identifier: scale_down_canary
+                          steps:
+                            - step:
+                                name: Canary Routes Scale Down
+                                identifier: canary_routes_scale_down
+                                template:
+                                  templateRef: account.canary_routes_config
+                                  versionLabel: "4"
+                                  templateInputs:
+                                    type: ShellScript
+                                    spec:
+                                      environmentVariables:
+                                        - name: Weight
+                                          type: String
+                                          value: <+serviceVariableOverrides.CanaryPercentage.split(',')[<+size(<+serviceVariableOverrides.CanaryPercentage.split(',')>)>-<+strategy.iteration>-2]>
+                                        - name: CanaryWorkload
+                                          type: String
+                                          value: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+strategy.node.rollback_canary_phase_group.identifierPostFix>.steps.canary_deploy_step.output.canaryWorkload>
+                                    when:
+                                      stageStatus: All
+                                    failureStrategies:
+                                      - onFailure:
+                                          errors:
+                                            - Connectivity
+                                            - DelegateProvisioning
+                                            - DelegateRestart
+                                          action:
+                                            type: Retry
+                                            spec:
+                                              retryCount: 3
+                                              retryIntervals:
+                                                - 1m
+                                              onRetryFailure:
+                                                action:
+                                                  type: ManualIntervention
+                                                  spec:
+                                                    timeout: 10m
+                                                    onTimeout:
+                                                      action:
+                                                        type: MarkAsFailure
+                                      - onFailure:
+                                          errors:
+                                            - AllErrors
+                                          action:
+                                            type: MarkAsFailure
+                            - step:
+                                type: Wait
+                                name: Canary Cooldown
+                                identifier: canary_cooldown
+                                spec:
+                                  duration: <+(<+serviceVariableOverrides.CanaryVerificationTime>=='' || <+serviceVariableOverrides.CanaryScaleDownWaitDuration>==null || <+serviceVariableOverrides.CanaryScaleDownWaitDuration>=='null')?'10m':<+serviceVariableOverrides.CanaryScaleDownWaitDuration>>
+                                when:
+                                  stageStatus: All
+                          strategy:
+                            repeat:
+                              times: <+size(<+serviceVariableOverrides.CanaryPercentage.split(',')>)-1>
+                              maxConcurrency: 1
+                            when: <+serviceVariableOverrides.EnableControlledCanary>=="True"
+                          when:
+                            stageStatus: All
+                            condition: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+strategy.node.rollback_canary_phase_group.identifierPostFix>.steps.scale_canary_step_group_<+<+<+size(<+serviceVariableOverrides.CanaryPercentage.split(',')>)-2>-<+strategy.iteration>>.toString()>.steps.canary_routes_config.status> == "SUCCEEDED" && <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+strategy.node.rollback_canary_phase_group.identifierPostFix>.steps.decrease_canary_traffic_<+strategy.iteration.toString()>.steps.scale_down.status> != "SUCCEEDED"
+                      - step:
+                          name: Canay Routes Scale Down
+                          identifier: canay_rollback_routes_scale_down
+                          template:
+                            templateRef: account.canary_routes_config
+                            versionLabel: "4"
+                            templateInputs:
+                              type: ShellScript
+                              spec:
+                                environmentVariables:
+                                  - name: Weight
+                                    type: String
+                                    value: "0"
+                                  - name: CanaryWorkload
+                                    type: String
+                                    value: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+stepGroup.identifierPostFix>.steps.canary_deploy_step.output.canaryWorkload>
+                              when:
+                                condition: <+serviceVariableOverrides.EnableControlledCanary>=="True"
+                                stageStatus: All
+                              failureStrategies: []
+                      - step:
+                          type: K8sCanaryDelete
+                          name: CanaryDelete Rollback
+                          identifier: CanaryDelete_Rollback
+                          spec: {}
+                          timeout: 10m
+                        isContainerStepGroup: false
+                      - step:
+                          name: Canary Service Deletion
+                          identifier: canary_service_deletion
+                          template:
+                            templateRef: account.canary_service_deletion
+                            versionLabel: "4"
+                            templateInputs:
+                              type: ShellScript
+                              spec:
+                                environmentVariables:
+                                  - name: CanaryWorkload
+                                    type: String
+                                    value: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+stepGroup.identifierPostFix>.steps.canary_deploy_step.output.canaryWorkload>
+                              when:
+                                condition: "true"
+                                stageStatus: All
+                              failureStrategies: []
+                        isContainerStepGroup: false
+                    strategy:
+                      matrix:
+                        overrideManifest: <+(<+serviceVariableOverrides.OverrideManifestFilePath>!=null && <+serviceVariableOverrides.OverrideManifestFilePath>!='null')?(<+<+serviceVariableOverrides.EnableSingularCanary>=='True'?[<+serviceVariableOverrides.OverrideManifestFilePath>]:<+serviceVariableOverrides.OverrideManifestFilePath.split(',')>>):['_null_']>
+                    variables:
+                      - name: ReleaseIdentifier
+                        type: String
+                        value: <+stepGroup.identifierPostFix.replaceAll('_','-')>
+                        description: ""
+                        required: false
+                      - name: OverrideManifestFilePath
+                        type: String
+                        value: <+matrix.overrideManifest>
+                        description: ""
+                        required: false
+                    when:
+                      stageStatus: All
+                      condition: <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+stepGroup.identifierPostFix>.status> == "FAILED" || <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+stepGroup.identifierPostFix>.status> == "APPROVAL_REJECTED" || <+pipeline.stages.<+stage.identifier>.spec.execution.steps.k8s_deployment_phase.steps.canary_phase_group<+stepGroup.identifierPostFix>.status> == "EXPIRED"
+          - stepGroup:
+              identifier: rollback_migration_phase
+              name: Rollback Migration
+              steps:
+                - step:
+                    name: Run Rollback Migration Script
+                    identifier: run_rollback_migration_script
+                    template:
+                      templateRef: account.run_rollback_migration_script
+                      versionLabel: "1"
+                      gitBranch: master
+                      templateInputs:
+                        type: ShellScript
+                        failureStrategies: []
+                        when:
+                          condition: <+serviceVariableOverrides.RollbackMigrationScriptFilePath> != null && <+serviceVariableOverrides.RollbackMigrationScriptFilePath> != "null"
+          - step:
+              identifier: cleanup
+              name: CleanUp
+              template:
+                templateRef: account.cleanup
+                versionLabel: "1"
+                templateInputs:
+                  type: ShellScript
+                  spec:
+                    environmentVariables:
+                      - name: destination
+                        type: String
+                        value: <+variable.service_workspace_path>
+                    delegateSelectors:
+                      - <+execution.steps.dds_schema_upload_phase.steps.select_delegate_upload.output.outputVariables.HOST_SELECTOR>
+                  when:
+                    condition: "false"
+                    stageStatus: All
+          - step:
+              type: JiraUpdate
+              identifier: jira
+              name: Jira
+              when:
+                stageStatus: Success
+                condition: <+env.type> == "Production"
+              failureStrategies:
+                - onFailure:
+                    errors:
+                      - AllErrors
+                    action:
+                      type: Ignore
+              timeout: 10m
+              spec:
+                connectorRef: account.hotstar_jira
+                issueKey: <+pipeline.stages.release_approval.spec.execution.steps.approval.steps.jira.issue.key>
+                transitionTo:
+                  transitionName: ""
+                  status: Archived
+                fields: []
+      service:
+        serviceRef: <+input>
+        serviceInputs: <+input>
+    failureStrategies:
+      - onFailure:
+          errors:
+            - DelegateProvisioning
+            - DelegateRestart
+            - Connectivity
+          action:
+            type: Retry
+            spec:
+              retryCount: 3
+              retryIntervals:
+                - 1m
+              onRetryFailure:
+                action:
+                  type: StageRollback
+      - onFailure:
+          errors:
+            - AllErrors
+          action:
+            type: StageRollback
+    variables:
+      - name: CommitId
+        type: String
+        value: <+artifact.tag.split('-')[2]>
+      - name: SkipCanary
+        type: String
+        default: "False"
+        value: <+input>.allowedValues(True,False)
+    when:
+      pipelineStatus: Success
+      condition: <+input>
+    strategy: <+input>
+  identifier: multi_phase_deploy
+  tags: {}
+  versionLabel: "36"

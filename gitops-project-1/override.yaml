@@ -1,0 +1,99 @@
+## Harness GitOps Agent - Overrides File
+## For default overrides, please refer to https://github.com/harness/gitops-helm/blob/main/values.yaml
+## Argo CD overrides can be found at https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/values.yaml
+
+
+
+# <---Harness configuration overrides--->
+harness:
+  identity:
+    accountIdentifier: vpCkHKsDSxK9_KYfjCTMKA
+    orgIdentifier: default
+    projectIdentifier: akshitdevrelharness
+    agentIdentifier: guestbookagent
+
+  secrets:
+    agentSecret: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFdmdJQkFEQU5CZ2txaGtpRzl3MEJBUUVGQUFTQ0JLZ3dnZ1NrQWdFQUFvSUJBUURNVERycldSSnNlZTRlCjd6Zk5mK01kVEdkcUI4SGd5bWZxdFM0eHNoa0ZEY0doY0UyOGZPdS9XL05BdUk5ajVMNVZRQ0h3MmtxOFhZYXkKbTczbGVsR3VxdmVnVXFoa3diRFNnRURhcHpKUzY0T1Zyd0JxUU5XdFpjOEFWZlhzY1h0ZW12ZjUvbkNBYTNldQpkSW8ySnkvdlVwZHJadE1NTW55M3hTbHdTZXNRTHU4ZHRneGJoN2lBRmNIUGJYQzQwU3hkSXg3SE5zRXNhZVZoCmxSQ0hIcDM0QkN0UEJTV1FqQXJBUmw2VkRyektCZVkxVXFlQnlrV245UmdLL2pMSWF1OGVHRFpBVjJKS1dRejYKdHg3bnRpV1c1MkR2cjRNN3dTWWhYMzYwc1NmdG1yVXdjd3hDVHpxd3NyenNjRTkrYmhKYXViQnhjc1c5bjJMRApSN0JjSURyWEFnTUJBQUVDZ2dFQUhOWGZuOENsT2VhN01PWStpcG9KUE9WQUFzdTdLNWJMWHhTWlEyTnFFUGdLCjdnQ1RhdmpPTDVGemFVaFkyTlo4U2owYlFxQnFXYmJ4Q3Z4YzFtc29PZmxMVlV6YXZzbndtQmd6enpPTk1LaXAKbkhMUElnVi9yaEh5SUkvVzA3dUZiYjk5ZVJnc0x6d1JSWnJtWW42dnp6THBuaEVDZ0lvUEVoaUQ0UGtBblhwawpjT3hLVWFHY0ZVdXpNZzVCcEZXL05GTVc1dzIrSUtrSW1YTHN2WlBBWGlVRmQ5K3pWWlNVbXJsUUZ3TWEwYmorCnQ1NmFYdnhub2hMTEVqTUNjV1g5TzdkWlk3SGVWMDdBMVltMkZjQVRQUTdoN2xSaXVDV1VyK1VUbWEvcCs2T08Kc3VNS3ZHNDVrVSs2TVp1TmtHYlJiREhPdTJkTk5nOXNEQ1kvWG5yOWpRS0JnUUR3U1FmTUh1ZVZ3TU1VL3JRRgpDK1FpeWt5UFdOeFViZUhIcXdzTTRuN0R2Y2U1MDlLeVk4THNpU0x6OVRDb3hLS0cyTjZsc1dQd05zMFZLN0xWCmljSlJYaFR1eEFLcXIrMVl6L2JUMis0UVBLek1MNXRLNW9VM25CdGdOZGNYdno2ZHExZDlxalUxWDM1YXJ1bDIKRTE1SDduV0hzbkc0UldNaEZwUXg4eDA2U3dLQmdRRFpxSzRScHdaVVlYdUFOSUQ5ZE9IVkhRSHVJdHhNbzU0awpsejgrbDFUU2E5MkprTytVdHM4R3M1WXd6Q1J6bmFxd1FLVUN4NzB2TkdwNmQxTmtCZXJOWjllUEN4RlhTeGVCCjRlTEJLMXJCN21GREZHREhCNlhObDZkUHk5RHFuWDBBalJTbURlSTM2NVpJMS8wcVJ2Q0toQmFVaHA2Zlo1cUEKV2pCTWtmT3FKUUtCZ1FETTlaNS9FTVY5eWFVZDNYejA2UVc2WDFFYTNUTmptUzhEdi9SM0V5UUtGM0dzSXZFUQpWV1JKbTFpRE85dzd1UzdoVTAvbmlmNnpRaXVCS1hzc0Jvd0lGL1pIREU4eUJVcXhmUU1RQ0FOek9pNHpKVkNUCmZUcVpDc0dYT1pXMW5kM3RZK0FIUXc2TDdsNjdQNFBJd2hDanp0WFYzL0o4dWtNcVVEWXN2VEZyTFFLQmdBeXUKSVFYeVB4SW5ZN1NDV29scGg4YU1uQkl0Z2J3TlJDZEprR3VyRVV2NDhMMFU3b0F4YmpvcnVESTdrbHdSOFdHMwpRbVc1RVRKdzBVczFMR3lGVTdxSHRDMG5MZWx4L0hxYW1FVThxMXJrOGxHZ0hFczhETksvWlFYbkQ5SzdQZzhNCktRbkxnVVJVdXpxZktxYU4zM0dTWkdaZXVWcjhCQ282RnRvL0huenBBb0dCQU1ieCsxN05nWU5xTjJKK3VLZnYKU3Vma2Z6R1RwdEZwdmVxQVRLZWdEdWs2dk9KQWpZVG8wOGk4elJZUHJyelBrRmx5WEdzcmYrSjNTRS84NzNEcgppNnFVeUlIZjhwV2MvMWRMMnpHTHNkTGRueUlDcWo0UmNtbG5TUWVYbHdLa3dnY1RzbFo1RFg4Smg3KzdnU2J1CmdaelNCUURRSlZOQ3djNWY0V3lLQWxuWgotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
+    # <---CA data overrides--->
+    caData:
+      enabled: false
+      secret: 
+    redisPassword: ac9B8Hes9pUifw==
+
+  gitopsServerHost: https://app.harness.io/gratis/gitops
+  networkPolicy:
+    create: false
+  createClusterRoles: true
+
+  configMap:
+    logLevel: DEBUG
+
+    # <---Agent communication protocol details--->
+    http:
+      agentHttpTarget: https://app.harness.io/gitops
+      tlsEnabled: false
+      certPath: /tmp/ca.bundle
+
+    reconcile:
+      appsetReconcile: true
+
+  # <---Disaster Recovery override values--->
+  disasterRecovery:
+    enabled: false
+    identifier: 
+
+  # <---Openshift override values--->
+  openshift:
+    enabled: false
+  flux:
+    enabled: false
+  argocdHarnessPlugin:
+    enabled: false
+
+argo-cd:
+  enabled: false
+
+
+
+# <---Agent overrides--->
+agent:
+  harnessName: guestbook-agent
+  image:
+    repository: docker.io/harness/gitops-agent
+    tag: v0.115.0
+
+  replicas: 1
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  fipsEnabled: false
+
+  autoscaling:
+    enabled: false
+
+  highAvailability: false
+  # <---Agent Proxy Config overrides--->
+  proxy:
+    enabled: false
+    httpProxy: 
+    httpsProxy: 
+
+# <---Agent upgrader overrides--->
+upgrader:
+  enabled: true
+  image: docker.io/harness/upgrader:latest
+
+  config:
+    # -- Proxy configuration for upgrader
+    # HTTPS_PROXY=proxyScheme://proxyUser:proxyPassword@proxyHost:proxyPort
+    proxyHost: 
+    proxyPort: 
+    proxyScheme: 
+    noProxy: 
+    proxyUser: 
+    proxyPassword: 
