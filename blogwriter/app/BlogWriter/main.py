@@ -13,7 +13,7 @@ log = app.logger
 APP_NAME = "BlogWriter"
 
 # https://google.github.io/adk-docs/agents/models/
-MODEL_ID = "gemini-2.5-flash-lite"
+MODEL_ID = "gemini-2.5-flash"
 
 
 # Define a simple function tool
