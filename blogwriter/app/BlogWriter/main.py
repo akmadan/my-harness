@@ -13,7 +13,7 @@ log = app.logger
 APP_NAME = "BlogWriter"
 
 # https://google.github.io/adk-docs/agents/models/
-MODEL_ID = "gemini-2.5-flash"
+MODEL_ID = "gemini-2.5-flash-lite"
 
 
 # Define a simple function tool
@@ -75,9 +75,10 @@ async def call_agent_async(query, user_id, session_id):
     final_response = None
     async for event in events:
         if event.is_final_response():
-            final_response = event.content.parts[0].text
+            if event.content and event.content.parts:
+                final_response = event.content.parts[0].text
 
-    return final_response
+    return final_response or "No response generated."
 
 
 @app.entrypoint
@@ -85,7 +86,7 @@ async def invoke(payload, context):
     log.info("Invoking Agent.....")
 
     # Process the user prompt
-    prompt = payload.get("prompt", "What can you help me with?")
+    prompt = payload.get("prompt") or payload.get("input", "What can you help me with?")
     session_id = getattr(context, "session_id", "default_session")
     user_id = payload.get("user_id", "default_user")
 

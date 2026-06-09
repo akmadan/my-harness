@@ -1,0 +1,253 @@
+template:
+  name: ADK Deployment to AWS AgentCore
+  identifier: ADK_Deployment_to_AWS_AgentCore
+  versionLabel: v2
+  type: Pipeline
+  projectIdentifier: akshitdevrelharness
+  orgIdentifier: default
+  tags:
+    framework: google-adk
+    runtime: aws-agentcore
+    build: codezip
+  spec:
+    stages:
+      - stage:
+          name: Validate
+          identifier: validate
+          type: CI
+          spec:
+            cloneCodebase: false
+            platform:
+              os: Linux
+              arch: Amd64
+            runtime:
+              type: Cloud
+              spec: {}
+            execution:
+              steps:
+                - step:
+                    type: GitClone
+                    name: Git Clone
+                    identifier: git_clone
+                    spec:
+                      connectorRef: <+input>
+                      repoName: <+input>
+                      build:
+                        type: branch
+                        spec:
+                          branch: <+input>
+                - step:
+                    name: Validate Project Structure
+                    identifier: validate_structure
+                    type: Run
+                    spec:
+                      shell: Sh
+                      command: |
+                        echo "==> Validating AgentCore project structure"
+                        REPO=$(ls /harness | head -1)
+                        BASE="/harness/$REPO/<+pipeline.variables.agentSubPath>"
+
+                        for f in \
+                          "agentcore/agentcore.json" \
+                          "app/<+pipeline.variables.runtimeName>/<+pipeline.variables.entrypoint>"; do
+                          if [ ! -f "$BASE/$f" ]; then
+                            echo "ERROR: Missing $f in $BASE"
+                            exit 1
+                          fi
+                          echo "  OK: $f"
+                        done
+
+                        echo "==> Validation passed"
+                        echo "--- agentcore.json ---"
+                        cat "$BASE/agentcore/agentcore.json"
+
+      - stage:
+          name: Deploy and Verify
+          identifier: deploy_and_verify
+          type: CI
+          spec:
+            cloneCodebase: false
+            platform:
+              os: Linux
+              arch: Amd64
+            runtime:
+              type: Cloud
+              spec: {}
+            execution:
+              steps:
+                - step:
+                    type: GitClone
+                    name: Git Clone
+                    identifier: git_clone
+                    spec:
+                      connectorRef: <+input>
+                      repoName: <+input>
+                      build:
+                        type: branch
+                        spec:
+                          branch: <+input>
+                - step:
+                    name: Deploy Agent
+                    identifier: deploy_agent
+                    type: Run
+                    spec:
+                      image: node:20-slim
+                      shell: Bash
+                      envVariables:
+                        AWS_ACCESS_KEY_ID: <+secrets.getValue("aws_access_key_id")>
+                        AWS_SECRET_ACCESS_KEY: <+secrets.getValue("aws_secret_access_key")>
+                        AWS_SESSION_TOKEN: <+secrets.getValue("aws_session_token")>
+                        AWS_DEFAULT_REGION: <+pipeline.variables.awsRegion>
+                        GEMINI_API_KEY: <+secrets.getValue("agentcore_gemini_key")>
+                        CI: "true"
+                      outputVariables:
+                        - name: DEPLOY_STACK
+                          type: String
+                          value: DEPLOY_STACK
+                      command: |
+                        set -euo pipefail
+
+                        # ── System deps ──────────────────────────────────
+                        apt-get update -qq
+                        apt-get install -y python3 python3-venv curl awscli --quiet
+
+                        # ── uv (required by agentcore CLI) ───────────────
+                        curl -LsSf https://astral.sh/uv/install.sh | sh
+                        export PATH="$HOME/.local/bin:$PATH"
+                        uv --version
+
+                        # ── AgentCore CLI + TypeScript ───────────────────
+                        npm install -g @aws/agentcore typescript@5.7 --quiet
+                        agentcore --version
+                        tsc --version
+
+                        # ── Navigate to project ──────────────────────────
+                        REPO=$(ls /harness | head -1)
+                        PROJECT_DIR="/harness/$REPO/<+pipeline.variables.agentSubPath>"
+                        cd "$PROJECT_DIR"
+
+                        # ── Install CDK project dependencies ─────────────
+                        echo "==> Installing CDK project dependencies"
+                        cd agentcore/cdk
+                        npm install --quiet
+                        cd "$PROJECT_DIR"
+
+                        # ── Generate agentcore/.env.local ────────────────
+                        printf 'AGENTCORE_CREDENTIAL_<+pipeline.variables.credentialEnvName>=%s\n' \
+                          "$GEMINI_API_KEY" > agentcore/.env.local
+                        echo "==> .env.local written (credential masked)"
+
+                        # ── Generate agentcore/aws-targets.json ──────────
+                        cat > agentcore/aws-targets.json << 'TGTEOF'
+                        [
+                          {
+                            "name": "default",
+                            "description": "Deployed via Harness CI",
+                            "account": "<+pipeline.variables.awsAccountId>",
+                            "region": "<+pipeline.variables.awsRegion>"
+                          }
+                        ]
+                        TGTEOF
+                        echo "==> aws-targets.json written:"
+                        cat agentcore/aws-targets.json
+
+                        # ── Verify AWS identity ──────────────────────────
+                        echo "==> Verifying AWS credentials"
+                        aws sts get-caller-identity
+
+                        # ── Deploy ───────────────────────────────────────
+                        echo "==> Running agentcore deploy"
+                        agentcore deploy --yes 2>&1 | tee /tmp/deploy.log
+                        DEPLOY_EXIT=${PIPESTATUS[0]}
+
+                        echo ""
+                        echo "==> Deploy log:"
+                        LATEST_LOG=$(ls -t agentcore/.cli/logs/deploy/*.log 2>/dev/null | head -1)
+                        if [ -n "$LATEST_LOG" ]; then
+                          cat "$LATEST_LOG"
+                        fi
+
+                        if [ "$DEPLOY_EXIT" -ne 0 ]; then
+                          echo "ERROR: agentcore deploy failed with exit code $DEPLOY_EXIT"
+                          exit "$DEPLOY_EXIT"
+                        fi
+
+                        DEPLOY_STACK=$(grep -oP 'Deployed \d+ stack\(s\): \K.*' /tmp/deploy.log || echo "unknown")
+                        echo "==> Deployed stack: $DEPLOY_STACK"
+                        export DEPLOY_STACK
+                - step:
+                    name: Smoke Test
+                    identifier: smoke_test
+                    type: Run
+                    spec:
+                      image: node:20-slim
+                      shell: Bash
+                      envVariables:
+                        AWS_ACCESS_KEY_ID: <+secrets.getValue("aws_access_key_id")>
+                        AWS_SECRET_ACCESS_KEY: <+secrets.getValue("aws_secret_access_key")>
+                        AWS_SESSION_TOKEN: <+secrets.getValue("aws_session_token")>
+                        AWS_DEFAULT_REGION: <+pipeline.variables.awsRegion>
+                        CI: "true"
+                      command: |
+                        set -euo pipefail
+
+                        npm install -g @aws/agentcore --quiet
+
+                        REPO=$(ls /harness | head -1)
+                        PROJECT_DIR="/harness/$REPO/<+pipeline.variables.agentSubPath>"
+                        cd "$PROJECT_DIR"
+
+                        echo "==> Checking deployed-state.json exists"
+                        cat agentcore/.cli/deployed-state.json
+
+                        echo "==> Invoking runtime: <+pipeline.variables.runtimeName>"
+                        RESPONSE=$(agentcore invoke \
+                          --runtime <+pipeline.variables.runtimeName> \
+                          '{"prompt": "Hello, are you there? Reply in one sentence."}' 2>&1) || true
+
+                        echo "Response: $RESPONSE"
+
+                        if [ -z "$RESPONSE" ]; then
+                          echo "WARNING: Empty response — smoke test inconclusive."
+                          echo "The agent may need ~10 minutes to fully activate."
+                          exit 0
+                        fi
+
+                        echo "==> Smoke test passed."
+
+    variables:
+      - name: agentSubPath
+        type: String
+        description: Path to the agentcore project folder inside the repo (e.g. blogwriter)
+        default: blogwriter
+        value: <+input>
+        required: true
+      - name: awsRegion
+        type: String
+        description: AWS region to deploy to
+        default: us-east-1
+        value: <+input>
+        required: true
+      - name: awsAccountId
+        type: String
+        description: AWS account ID (12 digits)
+        value: <+input>
+        required: true
+      - name: runtimeName
+        type: String
+        description: AgentCore runtime name (must match the name in agentcore.json)
+        default: BlogWriter
+        value: <+input>
+        required: true
+      - name: entrypoint
+        type: String
+        description: Agent entrypoint file name
+        default: main.py
+        value: <+input>
+        required: true
+      - name: credentialEnvName
+        type: String
+        description: Credential env var suffix — maps to AGENTCORE_CREDENTIAL_<name> in .env.local
+        default: BLOGWRITERGEMINI
+        value: <+input>
+        required: true
