@@ -1,0 +1,12 @@
+[project]
+name = "gamback-agentcore"
+version = "0.1.0"
+description = "Gamback ADK copilot packaged for Amazon Bedrock AgentCore Runtime (direct code deployment)."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
+    "pydantic>=2.9",
+    "google-adk>=0.3",
+    "portkey-ai>=1.9",
+]
